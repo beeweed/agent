@@ -74,10 +74,19 @@ export interface Model {
   description?: string;
 }
 
+export interface FileInContext {
+  path: string;
+  name: string;
+  extension: string;
+  type: string;
+}
+
 export interface MemoryStats {
   total_messages: number;
   tool_calls: number;
   files_created: number;
+  files_in_context: FileInContext[];
+  file_types: Record<string, number>;
 }
 
 export interface Memory {

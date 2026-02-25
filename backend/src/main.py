@@ -129,7 +129,9 @@ async def get_memory(session_id: str = "default"):
             "stats": {
                 "total_messages": 0,
                 "tool_calls": 0,
-                "files_created": 0
+                "files_created": 0,
+                "files_in_context": [],
+                "file_types": {}
             }
         }
     

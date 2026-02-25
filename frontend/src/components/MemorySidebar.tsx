@@ -1,12 +1,59 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { FileInContext } from "@/types";
+
+const FILE_TYPE_CONFIG: Record<string, { color: string; bgColor: string; icon: string }> = {
+  python: { color: "text-yellow-400", bgColor: "bg-yellow-500/20", icon: "🐍" },
+  javascript: { color: "text-yellow-300", bgColor: "bg-yellow-400/20", icon: "JS" },
+  typescript: { color: "text-blue-400", bgColor: "bg-blue-500/20", icon: "TS" },
+  html: { color: "text-orange-400", bgColor: "bg-orange-500/20", icon: "🌐" },
+  css: { color: "text-pink-400", bgColor: "bg-pink-500/20", icon: "🎨" },
+  json: { color: "text-green-400", bgColor: "bg-green-500/20", icon: "{}" },
+  config: { color: "text-gray-400", bgColor: "bg-gray-500/20", icon: "⚙️" },
+  markdown: { color: "text-slate-300", bgColor: "bg-slate-500/20", icon: "📝" },
+  text: { color: "text-slate-400", bgColor: "bg-slate-600/20", icon: "📄" },
+  database: { color: "text-cyan-400", bgColor: "bg-cyan-500/20", icon: "🗃️" },
+  shell: { color: "text-lime-400", bgColor: "bg-lime-500/20", icon: "💻" },
+  rust: { color: "text-orange-500", bgColor: "bg-orange-600/20", icon: "🦀" },
+  go: { color: "text-cyan-300", bgColor: "bg-cyan-400/20", icon: "Go" },
+  java: { color: "text-red-400", bgColor: "bg-red-500/20", icon: "☕" },
+  kotlin: { color: "text-purple-400", bgColor: "bg-purple-500/20", icon: "K" },
+  swift: { color: "text-orange-400", bgColor: "bg-orange-500/20", icon: "🔶" },
+  c: { color: "text-blue-300", bgColor: "bg-blue-400/20", icon: "C" },
+  cpp: { color: "text-blue-500", bgColor: "bg-blue-600/20", icon: "C+" },
+  ruby: { color: "text-red-400", bgColor: "bg-red-500/20", icon: "💎" },
+  php: { color: "text-indigo-400", bgColor: "bg-indigo-500/20", icon: "🐘" },
+  vue: { color: "text-emerald-400", bgColor: "bg-emerald-500/20", icon: "V" },
+  svelte: { color: "text-orange-500", bgColor: "bg-orange-600/20", icon: "S" },
+  astro: { color: "text-purple-400", bgColor: "bg-purple-500/20", icon: "🚀" },
+  image: { color: "text-rose-400", bgColor: "bg-rose-500/20", icon: "🖼️" },
+  other: { color: "text-gray-400", bgColor: "bg-gray-600/20", icon: "📁" },
+};
+
+const getFileTypeInfo = (type: string) => {
+  return FILE_TYPE_CONFIG[type] || FILE_TYPE_CONFIG.other;
+};
 
 export function MemorySidebar() {
   const { isMemoryOpen, setIsMemoryOpen, memory, currentIteration, maxIterations } = useStore();
   const { fetchMemory } = useApi();
+
+  const stats = memory?.stats || { total_messages: 0, tool_calls: 0, files_created: 0, files_in_context: [], file_types: {} };
+  const messages = memory?.messages || [];
+  const filesInContext = stats.files_in_context || [];
+
+  const sortedFileTypes = useMemo(() => {
+    const ft = stats.file_types || {};
+    return Object.entries(ft).sort((a, b) => b[1] - a[1]);
+  }, [stats.file_types]);
+
+  const totalFiles = useMemo(() => {
+    const ft = stats.file_types || {};
+    return Object.values(ft).reduce((sum, count) => sum + count, 0);
+  }, [stats.file_types]);
 
   useEffect(() => {
     if (isMemoryOpen) {
@@ -15,9 +62,6 @@ export function MemorySidebar() {
   }, [isMemoryOpen, fetchMemory]);
 
   if (!isMemoryOpen) return null;
-
-  const stats = memory?.stats || { total_messages: 0, tool_calls: 0, files_created: 0 };
-  const messages = memory?.messages || [];
 
   const getTimelineEntries = () => {
     const entries: Array<{
@@ -188,6 +232,15 @@ export function MemorySidebar() {
               Timeline
             </TabsTrigger>
             <TabsTrigger
+              value="files"
+              className="flex items-center gap-2 px-4 py-3 text-sm font-medium data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              Files
+            </TabsTrigger>
+            <TabsTrigger
               value="context"
               className="flex items-center gap-2 px-4 py-3 text-sm font-medium data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent"
             >
@@ -266,6 +319,108 @@ export function MemorySidebar() {
                     No activity yet. Start a conversation!
                   </div>
                 )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="files" data-design-id="files-tab-content" className="flex-1 overflow-hidden mt-0">
+            <ScrollArea className="h-full p-4">
+              {/* File Type Distribution */}
+              <div data-design-id="file-type-distribution" className="rounded-xl bg-[#363638] border border-border/30 overflow-hidden mb-4">
+                <div className="px-4 py-3 bg-[#2a2a2c] border-b border-border/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-sm font-medium text-foreground">File Types in Context</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{totalFiles} files</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  {sortedFileTypes.length > 0 ? (
+                    <div className="space-y-3">
+                      {sortedFileTypes.map(([type, count]) => {
+                        const info = getFileTypeInfo(type);
+                        const percentage = totalFiles > 0 ? (count / totalFiles) * 100 : 0;
+                        return (
+                          <div key={type} data-design-id={`file-type-${type}`} className="group">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-7 h-7 rounded-lg ${info.bgColor} flex items-center justify-center text-xs font-medium ${info.color}`}>
+                                  {info.icon}
+                                </span>
+                                <span className="text-xs font-medium text-foreground capitalize">{type}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{percentage.toFixed(0)}%</span>
+                                <span className={`text-xs font-semibold ${info.color}`}>{count}</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 bg-[#2a2a2c] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ease-out ${info.bgColor.replace('/20', '/60')}`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center">
+                      <svg className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <p className="text-sm text-muted-foreground">No files in context yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Files will appear here as the agent creates them</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Files List */}
+              <div data-design-id="files-list" className="rounded-xl bg-[#363638] border border-border/30 overflow-hidden">
+                <div className="px-4 py-3 bg-[#2a2a2c] border-b border-border/30">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm font-medium text-foreground">Recent Files</span>
+                  </div>
+                </div>
+                <div className="p-2 max-h-[300px] overflow-y-auto">
+                  {filesInContext.length > 0 ? (
+                    <div className="space-y-1">
+                      {filesInContext.slice().reverse().map((file: FileInContext, index: number) => {
+                        const info = getFileTypeInfo(file.type);
+                        return (
+                          <div
+                            key={`${file.path}-${index}`}
+                            data-design-id={`file-item-${index}`}
+                            className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#2a2a2c] transition-colors group cursor-default"
+                          >
+                            <span className={`w-8 h-8 rounded-lg ${info.bgColor} flex items-center justify-center text-xs font-medium ${info.color} flex-shrink-0`}>
+                              {info.icon}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{file.path}</p>
+                            </div>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${info.bgColor} ${info.color} capitalize flex-shrink-0`}>
+                              {file.extension || file.type}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No files created yet</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </ScrollArea>
           </TabsContent>

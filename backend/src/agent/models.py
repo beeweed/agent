@@ -95,26 +95,98 @@ class ContextWindow(BaseModel):
     
     def get_stats(self) -> dict:
         """Get statistics about the context window."""
+        import json
+        import os
+        
         tool_calls = 0
         files_created = 0
+        files_in_context: list[dict] = []
+        file_types: dict[str, int] = {}
         
         for msg in self.conversation_history:
             if msg.get("role") == "assistant" and msg.get("tool_calls"):
                 tool_calls += len(msg.get("tool_calls", []))
             if msg.get("role") == "tool" and msg.get("name") == "file_write":
                 try:
-                    import json
                     result = json.loads(msg.get("content", "{}"))
                     if result.get("success"):
                         files_created += 1
+                        file_path = result.get("file_path", "")
+                        if file_path:
+                            _, ext = os.path.splitext(file_path)
+                            ext = ext.lower() if ext else "no_extension"
+                            file_type = self._get_file_type_category(ext)
+                            
+                            file_types[file_type] = file_types.get(file_type, 0) + 1
+                            
+                            files_in_context.append({
+                                "path": file_path,
+                                "name": os.path.basename(file_path),
+                                "extension": ext,
+                                "type": file_type
+                            })
                 except:
                     pass
         
         return {
             "total_messages": len(self.conversation_history),
             "tool_calls": tool_calls,
-            "files_created": files_created
+            "files_created": files_created,
+            "files_in_context": files_in_context,
+            "file_types": file_types
         }
+    
+    def _get_file_type_category(self, ext: str) -> str:
+        """Categorize file extension into a type category."""
+        type_mapping = {
+            ".py": "python",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".html": "html",
+            ".htm": "html",
+            ".css": "css",
+            ".scss": "css",
+            ".sass": "css",
+            ".less": "css",
+            ".json": "json",
+            ".yaml": "config",
+            ".yml": "config",
+            ".toml": "config",
+            ".ini": "config",
+            ".env": "config",
+            ".md": "markdown",
+            ".mdx": "markdown",
+            ".txt": "text",
+            ".sql": "database",
+            ".sh": "shell",
+            ".bash": "shell",
+            ".zsh": "shell",
+            ".rs": "rust",
+            ".go": "go",
+            ".java": "java",
+            ".kt": "kotlin",
+            ".swift": "swift",
+            ".c": "c",
+            ".cpp": "cpp",
+            ".h": "c",
+            ".hpp": "cpp",
+            ".rb": "ruby",
+            ".php": "php",
+            ".vue": "vue",
+            ".svelte": "svelte",
+            ".astro": "astro",
+            ".svg": "image",
+            ".png": "image",
+            ".jpg": "image",
+            ".jpeg": "image",
+            ".gif": "image",
+            ".webp": "image",
+            ".ico": "image",
+            "no_extension": "other"
+        }
+        return type_mapping.get(ext, "other")
 
 
 class AgentState(BaseModel):
