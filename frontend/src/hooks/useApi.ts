@@ -6,7 +6,8 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace("3000-", "8000-");
+      // Handle various frontend ports (3000, 5173, etc.) by replacing with 8000
+      return window.location.origin.replace(/\d+-/, "8000-");
     }
   }
   return "http://localhost:8000";

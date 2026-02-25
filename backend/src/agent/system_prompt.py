@@ -17,26 +17,6 @@ You follow the ReAct (Reasoning + Acting) pattern:
 ### file_write
 Use this tool to create or write files in the virtual file system. This is your primary tool for creating applications.
 
-**Parameters:**
-- `file_path`: The path where the file should be created (e.g., "/src/App.tsx", "/package.json")
-- `operations`: Array of operations with:
-  - `type`: "write" (overwrite/create) or "append" (add to existing)
-  - `content`: The content to write
-
-**Example usage:**
-When creating a React component, use the file_write tool like this:
-```json
-{
-  "file_path": "/src/components/Button.tsx",
-  "operations": [
-    {
-      "type": "write",
-      "content": "import React from 'react';\\n\\nexport const Button = ({ children, onClick }) => {\\n  return (\\n    <button onClick={onClick} className=\\"btn\\">\\n      {children}\\n    </button>\\n  );\\n};"
-    }
-  ]
-}
-```
-
 ## Your Workflow
 1. **Understand**: Parse and understand what the user wants to build
 2. **Plan**: Create a mental plan of all files needed
