@@ -110,8 +110,27 @@ export function ComputerPanel() {
           >
             {codeStreaming.content ? (
               <pre className="m-0 font-mono text-[9px] xs:text-[11px] sm:text-[13px] leading-4 xs:leading-5 sm:leading-6">
-                <code>{renderCodeWithLineNumbers(codeStreaming.content)}</code>
+                <code>
+                  {renderCodeWithLineNumbers(codeStreaming.content)}
+                  {codeStreaming.isStreaming && <span className="typing-cursor" />}
+                </code>
               </pre>
+            ) : codeStreaming.isStreaming ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center px-3 xs:px-4">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-16 sm:h-16 mx-auto mb-2 xs:mb-3 sm:mb-4 rounded-lg xs:rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
+                    <Code className="w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 text-primary" />
+                  </div>
+                  <p className="text-[10px] xs:text-xs sm:text-sm text-foreground font-medium">
+                    Generating code...
+                  </p>
+                  <div className="flex items-center justify-center gap-1 mt-2">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center px-3 xs:px-4">
@@ -126,9 +145,6 @@ export function ComputerPanel() {
                   </p>
                 </div>
               </div>
-            )}
-            {codeStreaming.isStreaming && (
-              <span className="typing-cursor" />
             )}
           </div>
 
@@ -160,9 +176,14 @@ export function ComputerPanel() {
               </div>
               
               <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 flex-shrink-0">
-                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full border ${codeStreaming.isStreaming ? "bg-green-500 realtime-dot-pulse" : "bg-muted-foreground"}`} />
+                {codeStreaming.isStreaming && codeStreaming.content && (
+                  <span className="text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground mr-2">
+                    {codeStreaming.content.length} chars
+                  </span>
+                )}
+                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${codeStreaming.isStreaming ? "bg-green-500 realtime-dot-pulse" : "bg-muted-foreground"}`} />
                 <span className="text-[9px] xs:text-[10px] sm:text-sm text-muted-foreground">
-                  {codeStreaming.isStreaming ? "Live" : "Idle"}
+                  {codeStreaming.isStreaming ? "Streaming" : "Idle"}
                 </span>
               </div>
             </div>

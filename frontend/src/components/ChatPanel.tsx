@@ -129,6 +129,7 @@ export function ChatPanel() {
           case "code_stream_start":
             {
               const filePath = event.file_path || "";
+              console.log("[CODE_STREAM_START]", filePath);
               setCodeStreaming({
                 filePath,
                 content: "",
@@ -152,6 +153,7 @@ export function ChatPanel() {
             
           case "code_stream_chunk":
             if (event.chunk) {
+              console.log("[CODE_STREAM_CHUNK]", event.chunk.slice(0, 20) + "...");
               useStore.getState().appendStreamingCode(event.chunk);
             }
             break;

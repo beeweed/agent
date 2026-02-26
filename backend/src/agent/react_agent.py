@@ -321,6 +321,7 @@ class ReActAgent:
                             
                             if file_path and index not in streaming_started:
                                 streaming_started[index] = True
+                                print(f"[CODE_STREAM_START] {file_path}")
                                 yield {
                                     "type": "code_stream_start",
                                     "tool_id": update["id"],
@@ -330,6 +331,7 @@ class ReActAgent:
                                 }
                             
                             if content_delta:
+                                print(f"[CODE_STREAM_CHUNK] {len(content_delta)} chars: {content_delta[:30]}...")
                                 yield {
                                     "type": "code_stream_chunk",
                                     "tool_id": update["id"],
