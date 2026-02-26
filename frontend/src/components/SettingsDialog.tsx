@@ -54,17 +54,18 @@ export function SettingsDialog() {
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
       <DialogContent 
         data-design-id="settings-dialog"
-        className="w-[95vw] max-w-[95vw] xs:w-[90vw] xs:max-w-[90vw] sm:max-w-lg bg-[#2d2d2d] border-border/30 p-4 xs:p-6 rounded-xl"
+        className="w-[95vw] max-w-[95vw] xs:w-[90vw] xs:max-w-[90vw] sm:max-w-lg bg-card border-border p-4 xs:p-6 rounded-xl"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
+            <div className="p-2 rounded-xl bg-primary/15">
               <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <div>
-              <DialogTitle data-design-id="settings-title">Settings</DialogTitle>
+              <DialogTitle data-design-id="settings-title" className="text-foreground">Settings</DialogTitle>
               <p className="text-xs text-muted-foreground">Configure your Anygent</p>
             </div>
           </div>
@@ -79,7 +80,7 @@ export function SettingsDialog() {
               </svg>
               <label className="text-sm font-medium text-foreground">OpenRouter API Key</label>
             </div>
-            <div className="bg-[#363638] rounded-xl p-4">
+            <div className="bg-muted rounded-xl p-4 border border-border">
               <Input
                 data-design-id="api-key-input"
                 type="password"
@@ -105,7 +106,7 @@ export function SettingsDialog() {
           {/* Model Selection */}
           <div data-design-id="model-selection-section" className="space-y-3">
             <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               <label className="text-sm font-medium text-foreground">Select Model</label>
@@ -122,12 +123,12 @@ export function SettingsDialog() {
                 placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[#363638] rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground"
+                className="bg-muted border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             {/* Model List */}
-            <div className="bg-[#363638] rounded-lg xs:rounded-xl h-[150px] xs:h-[180px] sm:h-[200px] overflow-hidden">
+            <div className="bg-muted rounded-lg xs:rounded-xl h-[150px] xs:h-[180px] sm:h-[200px] overflow-hidden border border-border">
               <ScrollArea className="h-full p-2">
                 {modelsLoading ? (
                   <div className="flex items-center justify-center py-8">
@@ -152,7 +153,7 @@ export function SettingsDialog() {
                         className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
                           selectedModel === model.id
                             ? "bg-primary/15 border border-primary/30"
-                            : "hover:bg-[#2d2d2d]"
+                            : "hover:bg-accent"
                         }`}
                       >
                         <div className="min-w-0 flex-1">
@@ -174,11 +175,12 @@ export function SettingsDialog() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/30">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
+            data-design-id="settings-cancel-button"
             variant="ghost"
             onClick={() => setIsSettingsOpen(false)}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground hover:bg-accent"
           >
             Cancel
           </Button>
