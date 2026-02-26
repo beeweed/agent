@@ -88,11 +88,9 @@ export function ChatPanel() {
             }
             break;
             
-          case "tool_call":
-            if (event.tool_name === "file_write") {
-              const filePath = (event.arguments?.file_path as string) || "";
-              const content = (event.arguments?.content as string) || "";
-              
+          case "code_stream_start":
+            {
+              const filePath = event.file_path || "";
               setCodeStreaming({
                 filePath,
                 content: "",
@@ -100,22 +98,6 @@ export function ChatPanel() {
                 tool: "Editor",
                 action: `Editing ${filePath}`,
               });
-              
-              if (content) {
-                let currentIndex = 0;
-                const chunkSize = 50;
-                const streamContent = () => {
-                  if (currentIndex < content.length) {
-                    const chunk = content.slice(currentIndex, currentIndex + chunkSize);
-                    useStore.getState().appendStreamingCode(chunk);
-                    currentIndex += chunkSize;
-                    setTimeout(streamContent, 20);
-                  } else {
-                    setCodeStreaming({ isStreaming: false });
-                  }
-                };
-                streamContent();
-              }
               
               const fileEntry: ChatEntry = {
                 id: crypto.randomUUID(),
@@ -130,12 +112,27 @@ export function ChatPanel() {
             }
             break;
             
+          case "code_stream_chunk":
+            if (event.chunk) {
+              useStore.getState().appendStreamingCode(event.chunk);
+            }
+            break;
+            
+          case "code_stream_end":
+            break;
+            
+          case "tool_call":
+            break;
+            
           case "tool_result":
-            if (currentFileCardId && event.tool_name === "file_write") {
-              updateChatEntry(currentFileCardId, {
-                fileStatus: event.result?.success ? "created" : "error",
-              });
-              currentFileCardId = null;
+            if (event.tool_name === "file_write") {
+              if (currentFileCardId) {
+                updateChatEntry(currentFileCardId, {
+                  fileStatus: event.result?.success ? "created" : "error",
+                });
+                currentFileCardId = null;
+              }
+              setCodeStreaming({ isStreaming: false });
               fetchFileTree();
             }
             break;

@@ -54,7 +54,10 @@ export interface AgentEvent {
     | "complete"
     | "max_iterations_reached"
     | "error"
-    | "stream_end";
+    | "stream_end"
+    | "code_stream_start"
+    | "code_stream_chunk"
+    | "code_stream_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -65,6 +68,8 @@ export interface AgentEvent {
   result?: ToolResult;
   total_iterations?: number;
   message?: string;
+  chunk?: string;
+  file_path?: string;
 }
 
 export interface Model {

@@ -1,11 +1,175 @@
 import json
 import asyncio
 import uuid
+import re
 from typing import AsyncGenerator, Optional, Callable
 from .models import ContextWindow, AgentState
 from .system_prompt import get_system_prompt
 from ..services.openrouter import chat_completion, chat_completion_non_streaming
 from ..tools.file_write import file_write, FILE_WRITE_TOOL_DEFINITION
+
+
+class StreamingToolParser:
+    """Parser for streaming tool call arguments from LLM chunks."""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.tool_calls = {}
+        self.current_content = ""
+        self.finished = False
+    
+    def process_chunk(self, chunk: dict) -> dict:
+        """
+        Process a streaming chunk and extract tool calls or content.
+        
+        Returns a dict with:
+        - content_delta: New content text
+        - tool_updates: Dict of tool_id -> {name, arguments_delta, arguments_so_far}
+        - finish_reason: The finish reason if present
+        """
+        result = {
+            "content_delta": "",
+            "tool_updates": {},
+            "finish_reason": None
+        }
+        
+        choices = chunk.get("choices", [])
+        if not choices:
+            return result
+        
+        choice = choices[0]
+        delta = choice.get("delta", {})
+        result["finish_reason"] = choice.get("finish_reason")
+        
+        if "content" in delta and delta["content"]:
+            result["content_delta"] = delta["content"]
+            self.current_content += delta["content"]
+        
+        tool_calls = delta.get("tool_calls", [])
+        for tc in tool_calls:
+            index = tc.get("index", 0)
+            tool_id = tc.get("id")
+            
+            if index not in self.tool_calls:
+                self.tool_calls[index] = {
+                    "id": tool_id or f"call_{index}",
+                    "name": "",
+                    "arguments": ""
+                }
+            
+            if tool_id:
+                self.tool_calls[index]["id"] = tool_id
+            
+            function = tc.get("function", {})
+            if "name" in function:
+                self.tool_calls[index]["name"] = function["name"]
+            
+            if "arguments" in function:
+                arguments_delta = function["arguments"]
+                self.tool_calls[index]["arguments"] += arguments_delta
+                
+                result["tool_updates"][index] = {
+                    "id": self.tool_calls[index]["id"],
+                    "name": self.tool_calls[index]["name"],
+                    "arguments_delta": arguments_delta,
+                    "arguments_so_far": self.tool_calls[index]["arguments"]
+                }
+        
+        return result
+    
+    def get_parsed_tool_calls(self) -> list:
+        """Get fully parsed tool calls with parsed JSON arguments."""
+        parsed = []
+        for index in sorted(self.tool_calls.keys()):
+            tc = self.tool_calls[index]
+            try:
+                arguments = json.loads(tc["arguments"])
+            except json.JSONDecodeError:
+                arguments = {}
+            
+            parsed.append({
+                "id": tc["id"],
+                "function": {
+                    "name": tc["name"],
+                    "arguments": tc["arguments"]
+                },
+                "parsed_arguments": arguments
+            })
+        return parsed
+
+
+class ContentStreamExtractor:
+    """Extract content field from streaming JSON arguments."""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.buffer = ""
+        self.in_content = False
+        self.content_extracted = ""
+        self.escape_next = False
+        self.file_path = ""
+        self.file_path_extracted = False
+    
+    def extract_file_path(self, json_str: str) -> str:
+        """Try to extract file_path from partial JSON."""
+        match = re.search(r'"file_path"\s*:\s*"([^"]*)"', json_str)
+        if match:
+            return match.group(1)
+        return ""
+    
+    def process_delta(self, arguments_so_far: str) -> tuple[str, str]:
+        """
+        Process the arguments JSON string and extract new content.
+        Returns (new_content_delta, file_path).
+        """
+        if not self.file_path_extracted:
+            self.file_path = self.extract_file_path(arguments_so_far)
+            if self.file_path:
+                self.file_path_extracted = True
+        
+        content_match = re.search(r'"content"\s*:\s*"', arguments_so_far)
+        if not content_match:
+            return "", self.file_path
+        
+        start_idx = content_match.end()
+        
+        new_content = ""
+        i = start_idx + len(self.content_extracted)
+        
+        while i < len(arguments_so_far):
+            char = arguments_so_far[i]
+            
+            if self.escape_next:
+                if char == 'n':
+                    new_content += '\n'
+                elif char == 't':
+                    new_content += '\t'
+                elif char == 'r':
+                    new_content += '\r'
+                elif char == '\\':
+                    new_content += '\\'
+                elif char == '"':
+                    new_content += '"'
+                elif char == '/':
+                    new_content += '/'
+                else:
+                    new_content += char
+                self.escape_next = False
+            elif char == '\\':
+                self.escape_next = True
+            elif char == '"':
+                break
+            else:
+                new_content += char
+            
+            i += 1
+        
+        self.content_extracted += new_content
+        return new_content, self.file_path
 
 
 class ReActAgent:
@@ -59,14 +223,14 @@ class ReActAgent:
         on_event: Optional[Callable] = None
     ) -> AsyncGenerator:
         """
-        Run the ReAct agent loop.
+        Run the ReAct agent loop with real-time streaming.
         
         Args:
             user_message: The user's input message
             on_event: Optional callback for events
             
         Yields:
-            Events from the agent execution
+            Events from the agent execution including real-time code streaming
         """
         self.is_running = True
         self.current_iteration = 0
@@ -91,47 +255,108 @@ class ReActAgent:
                 
                 messages = self._get_messages()
                 
-                response = await chat_completion_non_streaming(
+                stream_parser = StreamingToolParser()
+                content_extractors = {}
+                accumulated_content = ""
+                has_tool_calls = False
+                finish_reason = None
+                streaming_started = {}
+                
+                async for chunk_event in chat_completion(
                     api_key=self.api_key,
                     model=self.model,
                     messages=messages,
-                    tools=self.tools
-                )
+                    tools=self.tools,
+                    stream=True
+                ):
+                    if chunk_event.get("type") == "error":
+                        yield {
+                            "type": "error",
+                            "error": chunk_event.get("error", "Unknown error")
+                        }
+                        self.is_running = False
+                        return
+                    
+                    if chunk_event.get("type") == "done":
+                        break
+                    
+                    if chunk_event.get("type") != "chunk":
+                        continue
+                    
+                    chunk_data = chunk_event.get("data", {})
+                    parsed = stream_parser.process_chunk(chunk_data)
+                    
+                    if parsed["content_delta"]:
+                        accumulated_content += parsed["content_delta"]
+                    
+                    if parsed["finish_reason"]:
+                        finish_reason = parsed["finish_reason"]
+                    
+                    for index, update in parsed["tool_updates"].items():
+                        has_tool_calls = True
+                        tool_name = update["name"]
+                        
+                        if tool_name == "file_write":
+                            if index not in content_extractors:
+                                content_extractors[index] = ContentStreamExtractor()
+                            
+                            extractor = content_extractors[index]
+                            content_delta, file_path = extractor.process_delta(
+                                update["arguments_so_far"]
+                            )
+                            
+                            if file_path and index not in streaming_started:
+                                streaming_started[index] = True
+                                yield {
+                                    "type": "code_stream_start",
+                                    "tool_id": update["id"],
+                                    "tool_name": tool_name,
+                                    "file_path": file_path,
+                                    "iteration": self.current_iteration
+                                }
+                            
+                            if content_delta:
+                                yield {
+                                    "type": "code_stream_chunk",
+                                    "tool_id": update["id"],
+                                    "chunk": content_delta,
+                                    "file_path": file_path,
+                                    "iteration": self.current_iteration
+                                }
                 
-                if not response.get("success"):
-                    yield {
-                        "type": "error",
-                        "error": response.get("error", "Unknown error")
-                    }
-                    break
-                
-                data = response.get("data", {})
-                choice = data.get("choices", [{}])[0]
-                message = choice.get("message", {})
-                finish_reason = choice.get("finish_reason", "")
-                
-                content = message.get("content", "")
-                tool_calls = message.get("tool_calls", [])
-                
-                if content:
+                if accumulated_content:
                     yield {
                         "type": "thought",
-                        "content": content,
+                        "content": accumulated_content,
                         "iteration": self.current_iteration
                     }
                 
-                if tool_calls:
-                    self.context.add_tool_call(tool_calls, content)
+                if has_tool_calls:
+                    tool_calls = stream_parser.get_parsed_tool_calls()
                     
-                    for tool_call in tool_calls:
-                        tool_name = tool_call.get("function", {}).get("name", "")
-                        tool_id = tool_call.get("id", str(uuid.uuid4()))
+                    formatted_tool_calls = []
+                    for tc in tool_calls:
+                        formatted_tool_calls.append({
+                            "id": tc["id"],
+                            "function": tc["function"],
+                            "type": "function"
+                        })
+                    
+                    self.context.add_tool_call(formatted_tool_calls, accumulated_content)
+                    
+                    for i, tc in enumerate(tool_calls):
+                        tool_name = tc["function"]["name"]
+                        tool_id = tc["id"]
+                        arguments = tc["parsed_arguments"]
                         
-                        try:
-                            arguments_str = tool_call.get("function", {}).get("arguments", "{}")
-                            arguments = json.loads(arguments_str)
-                        except json.JSONDecodeError:
-                            arguments = {}
+                        if i in streaming_started:
+                            yield {
+                                "type": "code_stream_end",
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "file_path": arguments.get("file_path", ""),
+                                "iteration": self.current_iteration
+                            }
                         
                         yield {
                             "type": "tool_call",
@@ -172,19 +397,19 @@ class ReActAgent:
                                 "iteration": self.current_iteration
                             }
                 
-                elif content and finish_reason == "stop":
-                    self.context.add_assistant_message(content)
+                elif accumulated_content and finish_reason == "stop":
+                    self.context.add_assistant_message(accumulated_content)
                     
                     yield {
                         "type": "complete",
-                        "content": content,
+                        "content": accumulated_content,
                         "iteration": self.current_iteration,
                         "total_iterations": self.current_iteration
                     }
                     self.is_running = False
                     break
                 
-                elif not tool_calls and not content:
+                elif not has_tool_calls and not accumulated_content:
                     yield {
                         "type": "complete",
                         "content": "Task completed.",
@@ -194,7 +419,7 @@ class ReActAgent:
                     self.is_running = False
                     break
                 
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05)
             
             if self.current_iteration >= self.max_iterations:
                 yield {
