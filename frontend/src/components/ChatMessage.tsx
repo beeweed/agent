@@ -41,12 +41,16 @@ export function ChatMessage({ entry }: ChatMessageProps) {
         <div className="flex items-center gap-2 mb-3">
           <div 
             data-design-id="assistant-avatar"
-            className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center"
+            className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gradient-to-br from-cyan-400/20 to-emerald-400/20"
           >
-            <LemonLogo />
+            <img 
+              src="/ai-robot.png" 
+              alt="AI Assistant" 
+              className="w-8 h-8 object-cover"
+            />
           </div>
           <span data-design-id="assistant-name" className="font-semibold text-sm text-foreground">
-            Lemon AI
+            Anygent AI
           </span>
           {entry.iteration && (
             <span className="text-xs text-muted-foreground">

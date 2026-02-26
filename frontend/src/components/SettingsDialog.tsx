@@ -127,47 +127,49 @@ export function SettingsDialog() {
             </div>
 
             {/* Model List */}
-            <ScrollArea className="bg-[#363638] rounded-xl max-h-[280px] p-2">
-              {modelsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <svg className="w-6 h-6 text-primary animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </div>
-              ) : !apiKey ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  Enter your API key to load models
-                </div>
-              ) : filteredModels.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  {searchQuery ? "No models found" : "No models available"}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {filteredModels.map((model) => (
-                    <div
-                      key={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                        selectedModel === model.id
-                          ? "bg-primary/15 border border-primary/30"
-                          : "hover:bg-white/5"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{model.name}</div>
-                        <div className="text-[10px] text-muted-foreground">{model.id}</div>
+            <div className="bg-[#363638] rounded-xl h-[200px] overflow-hidden">
+              <ScrollArea className="h-full p-2">
+                {modelsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <svg className="w-6 h-6 text-primary animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                ) : !apiKey ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    Enter your API key to load models
+                  </div>
+                ) : filteredModels.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    {searchQuery ? "No models found" : "No models available"}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredModels.map((model) => (
+                      <div
+                        key={model.id}
+                        onClick={() => setSelectedModel(model.id)}
+                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                          selectedModel === model.id
+                            ? "bg-primary/15 border border-primary/30"
+                            : "hover:bg-[#2d2d2d]"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-foreground truncate">{model.name}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{model.id}</div>
+                        </div>
+                        {selectedModel === model.id && (
+                          <svg className="w-5 h-5 text-primary flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
                       </div>
-                      {selectedModel === model.id && (
-                        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
           </div>
         </div>
 

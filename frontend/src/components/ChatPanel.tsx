@@ -5,7 +5,6 @@ import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import type { AgentEvent, ChatEntry } from "@/types";
 import { 
-  Share2, 
   ChevronDown, 
   Send,
   Settings,
@@ -255,13 +254,7 @@ export function ChatPanel() {
           >
             <RotateCcw className="w-4 h-4" />
           </button>
-          <button 
-            data-design-id="share-btn"
-            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors hidden sm:flex"
-            title="Share"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
+          
           <button 
             data-design-id="settings-btn"
             onClick={() => setIsSettingsOpen(true)}
