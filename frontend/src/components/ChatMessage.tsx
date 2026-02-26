@@ -7,7 +7,7 @@ function AnygentLogo() {
     <img 
       src="/anygent-logo.png" 
       alt="Anygent AI" 
-      className="w-6 h-6 object-contain"
+      className="w-16 h-16 object-contain"
     />
   );
 }
@@ -48,27 +48,28 @@ export function ChatMessage({ entry }: ChatMessageProps) {
   if (entry.type === "assistant") {
     return (
       <div data-design-id={`assistant-message-${entry.id}`} className="animate-fade-in">
-        <div className="flex items-center gap-2 mb-3">
+        {/* Logo and branding on top */}
+        <div className="flex flex-col items-start mb-4">
           <div 
             data-design-id="assistant-avatar"
-            className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+            className="mb-1"
           >
             <AnygentLogo />
           </div>
-          <span data-design-id="assistant-name" className="font-semibold text-sm text-foreground">
-            Anygent AI
+          <span data-design-id="assistant-name" className="font-bold text-base">
+            <span className="text-purple-400">Anygent</span>
+            <span className="text-foreground"> AI</span>
           </span>
           {entry.iteration && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground mt-1">
               thinking...
             </span>
           )}
         </div>
         
-        <div className="pl-10">
-          <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-            {entry.content}
-          </div>
+        {/* Response content below */}
+        <div className="text-lg leading-relaxed text-foreground whitespace-pre-wrap">
+          {entry.content}
         </div>
       </div>
     );

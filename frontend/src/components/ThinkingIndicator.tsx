@@ -8,7 +8,7 @@ function AnygentLogo() {
     <img 
       src="/anygent-logo.png" 
       alt="Anygent AI" 
-      className="w-6 h-6 object-contain"
+      className="w-16 h-16 object-contain"
     />
   );
 }
@@ -16,21 +16,19 @@ function AnygentLogo() {
 export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicatorProps) {
   return (
     <div data-design-id="thinking-indicator" className="animate-fade-in">
-      <div className="flex items-center gap-2 mb-3">
-        <div 
-          className="w-8 h-8 flex items-center justify-center flex-shrink-0 animate-pulse"
-        >
+      {/* Logo and branding on top */}
+      <div className="flex flex-col items-start mb-4">
+        <div className="mb-1 animate-pulse">
           <AnygentLogo />
         </div>
-        <span className="font-semibold text-sm text-foreground">
-          Anygent AI
-        </span>
-        <span className="text-xs text-muted-foreground">
-          thinking...
+        <span className="font-bold text-base">
+          <span className="text-purple-400">Anygent</span>
+          <span className="text-foreground"> AI</span>
         </span>
       </div>
       
-      <div className="pl-10">
+      {/* Thinking status below */}
+      <div>
         {iteration > 0 && (
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 mb-3">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
@@ -40,11 +38,11 @@ export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicato
           </div>
         )}
         
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-lg text-muted-foreground">
           <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground loading-dot"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground loading-dot"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground loading-dot"></div>
+            <div className="w-2 h-2 rounded-full bg-muted-foreground loading-dot"></div>
+            <div className="w-2 h-2 rounded-full bg-muted-foreground loading-dot"></div>
+            <div className="w-2 h-2 rounded-full bg-muted-foreground loading-dot"></div>
           </div>
           <span>Thinking...</span>
         </div>
