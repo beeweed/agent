@@ -6,13 +6,22 @@ interface ThinkingIndicatorProps {
 function AnygentLogo() {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="6" width="18" height="12" rx="3" fill="#ffc700"/>
-      <circle cx="8.5" cy="12" r="2" fill="#34322d"/>
-      <circle cx="15.5" cy="12" r="2" fill="#34322d"/>
-      <rect x="10" y="3" width="4" height="4" rx="1" fill="#ffc700"/>
-      <rect x="11" y="1" width="2" height="3" rx="0.5" fill="#ffc700"/>
-      <rect x="6" y="18" width="3" height="3" rx="1" fill="#ffc700"/>
-      <rect x="15" y="18" width="3" height="3" rx="1" fill="#ffc700"/>
+      {/* Modern stylized "A" letter - clean geometric design */}
+      <path 
+        d="M12 2L3 22H7.5L9.5 17H14.5L16.5 22H21L12 2Z" 
+        fill="url(#goldGradientThinking)"
+      />
+      <path 
+        d="M10.5 14L12 9L13.5 14H10.5Z" 
+        fill="#1a1a1a"
+      />
+      <defs>
+        <linearGradient id="goldGradientThinking" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffe066"/>
+          <stop offset="50%" stopColor="#ffc700"/>
+          <stop offset="100%" stopColor="#e6a800"/>
+        </linearGradient>
+      </defs>
     </svg>
   );
 }
