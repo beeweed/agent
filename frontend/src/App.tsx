@@ -11,7 +11,7 @@ function App() {
   const { mobileTab, setMobileTab, rightPanel, setRightPanel } = useStore();
 
   return (
-    <div data-design-id="app-container" className="h-screen w-screen overflow-hidden bg-background">
+    <div data-design-id="app-container" className="h-dvh w-screen overflow-hidden bg-background flex flex-col">
       <script
         data-design-ignore="true"
         dangerouslySetInnerHTML={{
@@ -34,7 +34,7 @@ function App() {
         }}
       />
       
-      <div data-design-id="desktop-layout" className="hidden md:flex h-full">
+      <div data-design-id="desktop-layout" className="hidden md:flex flex-1 min-h-0">
         <div 
           data-design-id="chat-panel-container"
           className="w-full md:w-[45%] lg:w-[40%] xl:w-[35%] h-full flex flex-col px-3 md:px-4 lg:px-5 overflow-hidden flex-shrink-0"
@@ -90,24 +90,24 @@ function App() {
         </div>
       </div>
 
-      <div data-design-id="mobile-layout" className="md:hidden flex flex-col h-full safe-area-top">
-        <div className="flex-1 overflow-hidden">
+      <div data-design-id="mobile-layout" className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === "chat" ? (
-            <div className="h-full px-2 xs:px-3 sm:px-4">
+            <div className="h-full overflow-hidden px-2 xs:px-3 sm:px-4">
               <ChatPanel />
             </div>
           ) : mobileTab === "computer" ? (
-            <div className="h-full">
+            <div className="h-full overflow-hidden">
               <ComputerPanel />
             </div>
           ) : (
-            <div className="h-full">
+            <div className="h-full overflow-hidden">
               <FilePanel />
             </div>
           )}
         </div>
 
-        <div data-design-id="mobile-tab-bar" className="flex h-14 xs:h-16 bg-card border-t border-border safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        <div data-design-id="mobile-tab-bar" className="flex-shrink-0 flex h-12 xs:h-14 bg-card border-t border-border safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
           <button
             data-design-id="mobile-chat-tab"
             onClick={() => setMobileTab("chat")}

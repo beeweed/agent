@@ -268,7 +268,7 @@ export function ChatPanel() {
 
       <div 
         data-design-id="chat-messages"
-        className="flex-1 overflow-y-auto py-3 xs:py-4 sm:py-5 scrollbar-none"
+        className="flex-1 min-h-0 overflow-y-auto py-2 xs:py-3 sm:py-5 scrollbar-none"
         ref={scrollRef}
       >
         <div className="space-y-4 xs:space-y-5 sm:space-y-6 max-w-[768px] mx-auto">
@@ -281,7 +281,7 @@ export function ChatPanel() {
         </div>
       </div>
 
-      <div data-design-id="chat-input-area" className="sticky bottom-0 py-2 xs:py-3 bg-background">
+      <div data-design-id="chat-input-area" className="flex-shrink-0 py-2 xs:py-3 bg-background">
         {isAgentRunning && (
           <div className="flex items-center justify-between mb-2 xs:mb-3 px-1">
             <div className="inline-flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 py-0.5 xs:py-1 rounded-md xs:rounded-lg bg-primary/10 border border-primary/20">
@@ -302,7 +302,7 @@ export function ChatPanel() {
         <div data-design-id="input-wrapper" className="w-full">
           <div 
             data-design-id="input-area"
-            className="flex flex-col min-h-[100px] xs:min-h-[110px] sm:min-h-[140px] p-2 xs:p-3 sm:p-5 pb-2 xs:pb-3 rounded-lg xs:rounded-xl sm:rounded-2xl bg-card shadow-sm border border-border"
+            className="flex flex-col min-h-[80px] xs:min-h-[90px] sm:min-h-[140px] p-2 xs:p-2.5 sm:p-5 pb-2 xs:pb-2.5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-card shadow-sm border border-border"
           >
             <div className="flex-1 flex flex-col justify-between">
               <textarea
@@ -312,7 +312,7 @@ export function ChatPanel() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full min-h-[40px] xs:min-h-[50px] sm:min-h-[60px] bg-transparent border-none outline-none resize-none font-sans text-xs xs:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground"
+                className="w-full min-h-[32px] xs:min-h-[40px] sm:min-h-[60px] bg-transparent border-none outline-none resize-none font-sans text-xs xs:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground"
                 disabled={isAgentRunning}
                 rows={2}
               />
