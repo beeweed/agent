@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { Monitor, Code, Play, SkipBack, SkipForward } from "lucide-react";
+import hljs from "highlight.js";
+import "highlight.js/styles/github.css";
 
 export function ComputerPanel() {
   const { codeStreaming, isAgentRunning } = useStore();
@@ -16,49 +18,71 @@ export function ComputerPanel() {
     return path.split("/").pop() || "Untitled";
   };
 
-  const renderCodeWithLineNumbers = (content: string) => {
-    if (!content) return null;
-    
-    const lines = content.split("\n");
-    return lines.map((line, index) => (
-      <div key={index} className="code-line group hover:bg-[#f5f5f5]">
-        <span className="line-number">{index + 1}</span>
-        <span className="line-content">
-          {highlightSyntax(line)}
-        </span>
-      </div>
-    ));
+  // Detect language from file extension
+  const getLanguageFromPath = (filePath: string): string => {
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
+    const langMap: Record<string, string> = {
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'py': 'python',
+      'json': 'json',
+      'css': 'css',
+      'html': 'html',
+      'md': 'markdown',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'sh': 'bash',
+      'bash': 'bash',
+      'sql': 'sql',
+      'xml': 'xml',
+    };
+    return langMap[ext] || 'plaintext';
   };
 
-  const highlightSyntax = (line: string) => {
-    let result = line;
+  // Highlight the entire code block using highlight.js
+  const highlightedCode = useMemo(() => {
+    if (!codeStreaming.content) return null;
     
-    result = result.replace(
-      /(\/\/.*$|\/\*[\s\S]*?\*\/)/gm,
-      '<span class="hljs-comment">$1</span>'
-    );
+    const language = codeStreaming.filePath 
+      ? getLanguageFromPath(codeStreaming.filePath) 
+      : 'plaintext';
     
-    result = result.replace(
-      /\b(import|export|from|const|let|var|function|return|if|else|for|while|class|interface|type|async|await|new|this|extends|implements|private|public|protected|static|readonly|enum|namespace|module|declare|abstract|as|is|in|of|try|catch|finally|throw|typeof|instanceof|void|null|undefined|true|false)\b/g,
-      '<span class="hljs-keyword">$1</span>'
-    );
+    try {
+      const result = hljs.highlight(codeStreaming.content, { 
+        language,
+        ignoreIllegals: true 
+      });
+      return result.value;
+    } catch {
+      // Fallback to auto-detection if specific language fails
+      try {
+        const result = hljs.highlightAuto(codeStreaming.content);
+        return result.value;
+      } catch {
+        return codeStreaming.content;
+      }
+    }
+  }, [codeStreaming.content, codeStreaming.filePath]);
+
+  const renderCodeWithLineNumbers = (highlightedHtml: string) => {
+    if (!highlightedHtml) return null;
     
-    result = result.replace(
-      /(['"`])(?:(?!\1)[^\\]|\\.)*?\1/g,
-      '<span class="hljs-string">$&</span>'
-    );
+    // Split by newlines, preserving HTML tags
+    const lines = highlightedHtml.split('\n');
     
-    result = result.replace(
-      /\b(\d+\.?\d*)\b/g,
-      '<span class="hljs-number">$1</span>'
-    );
-    
-    result = result.replace(
-      /\b([A-Z][a-zA-Z0-9]*)\b/g,
-      '<span class="hljs-class">$1</span>'
-    );
-    
-    return <span dangerouslySetInnerHTML={{ __html: result }} />;
+    return lines.map((line, index) => (
+      <div key={index} className="code-line group hover:bg-blue-50/50 flex">
+        <span className="line-number select-none w-8 sm:w-10 text-right pr-3 text-gray-400 flex-shrink-0">
+          {index + 1}
+        </span>
+        <span 
+          className="line-content flex-1 text-gray-800"
+          dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }}
+        />
+      </div>
+    ));
   };
 
   return (
@@ -108,10 +132,10 @@ export function ComputerPanel() {
             ref={codeContainerRef}
             className="flex-1 overflow-auto bg-[#f5f5f5] p-1.5 xs:p-2 sm:p-3"
           >
-            {codeStreaming.content ? (
-              <pre className="m-0 font-mono text-[9px] xs:text-[11px] sm:text-[13px] leading-4 xs:leading-5 sm:leading-6">
-                <code>
-                  {renderCodeWithLineNumbers(codeStreaming.content)}
+            {codeStreaming.content && highlightedCode ? (
+              <pre className="m-0 font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
+                <code className="hljs">
+                  {renderCodeWithLineNumbers(highlightedCode)}
                   {codeStreaming.isStreaming && <span className="typing-cursor" />}
                 </code>
               </pre>

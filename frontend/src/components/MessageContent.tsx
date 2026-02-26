@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import hljs from "highlight.js";
+import "highlight.js/styles/vs2015.css";
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 
@@ -61,10 +62,11 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
         </button>
       </div>
       <div className="overflow-x-auto">
-        <pre className="p-4 text-sm leading-relaxed m-0">
+        <pre className="p-4 text-sm leading-relaxed m-0 text-gray-100">
           <code
             ref={codeRef}
-            className={`language-${displayLanguage} !bg-transparent`}
+            className={`language-${displayLanguage} !bg-transparent text-gray-100`}
+            style={{ color: '#d4d4d4' }}
           >
             {code}
           </code>

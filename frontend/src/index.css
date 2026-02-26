@@ -421,3 +421,81 @@
   border-radius: 0.75rem;
   margin: 0.5rem 0;
 }
+
+/* Computer Panel - Light theme syntax highlighting */
+[data-design-id="computer-code-area"] .hljs {
+  background: transparent !important;
+  color: #24292e;
+}
+[data-design-id="computer-code-area"] .hljs-comment,
+[data-design-id="computer-code-area"] .hljs-quote { 
+  color: #6a737d; 
+  font-style: italic; 
+}
+[data-design-id="computer-code-area"] .hljs-keyword,
+[data-design-id="computer-code-area"] .hljs-selector-tag { 
+  color: #d73a49; 
+  font-weight: 500;
+}
+[data-design-id="computer-code-area"] .hljs-string,
+[data-design-id="computer-code-area"] .hljs-template-literal { 
+  color: #032f62; 
+}
+[data-design-id="computer-code-area"] .hljs-number,
+[data-design-id="computer-code-area"] .hljs-literal { 
+  color: #005cc5; 
+}
+[data-design-id="computer-code-area"] .hljs-function,
+[data-design-id="computer-code-area"] .hljs-title,
+[data-design-id="computer-code-area"] .hljs-title.function_ { 
+  color: #6f42c1; 
+}
+[data-design-id="computer-code-area"] .hljs-class,
+[data-design-id="computer-code-area"] .hljs-title.class_ { 
+  color: #6f42c1; 
+}
+[data-design-id="computer-code-area"] .hljs-tag { 
+  color: #22863a; 
+}
+[data-design-id="computer-code-area"] .hljs-attr,
+[data-design-id="computer-code-area"] .hljs-attribute { 
+  color: #6f42c1; 
+}
+[data-design-id="computer-code-area"] .hljs-variable,
+[data-design-id="computer-code-area"] .hljs-template-variable { 
+  color: #e36209; 
+}
+[data-design-id="computer-code-area"] .hljs-built_in { 
+  color: #005cc5; 
+}
+[data-design-id="computer-code-area"] .hljs-params { 
+  color: #24292e; 
+}
+[data-design-id="computer-code-area"] .hljs-type { 
+  color: #005cc5; 
+}
+[data-design-id="computer-code-area"] .hljs-regexp { 
+  color: #032f62; 
+}
+[data-design-id="computer-code-area"] .hljs-symbol { 
+  color: #005cc5; 
+}
+[data-design-id="computer-code-area"] .hljs-meta { 
+  color: #735c0f; 
+}
+[data-design-id="computer-code-area"] .hljs-punctuation,
+[data-design-id="computer-code-area"] .hljs-operator { 
+  color: #24292e; 
+}
+[data-design-id="computer-code-area"] .hljs-property { 
+  color: #005cc5; 
+}
+[data-design-id="computer-code-area"] .hljs-name { 
+  color: #22863a; 
+}
+[data-design-id="computer-code-area"] .hljs-selector-class { 
+  color: #6f42c1; 
+}
+[data-design-id="computer-code-area"] .hljs-selector-id { 
+  color: #005cc5; 
+}
