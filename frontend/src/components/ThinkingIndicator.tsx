@@ -13,7 +13,7 @@ function AnygentLogo() {
   );
 }
 
-export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicatorProps) {
+export function ThinkingIndicator(_props: ThinkingIndicatorProps) {
   return (
     <div data-design-id="thinking-indicator" className="animate-fade-in">
       <div className="flex flex-col items-start">
@@ -22,7 +22,7 @@ export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicato
         </div>
         
         <div className="flex items-baseline gap-0.5 xs:gap-1">
-          <span className="font-bold text-sm xs:text-base text-purple-400">anygent</span>
+          <span className="font-bold text-sm xs:text-base text-purple-400">Anygent</span>
           <span className="text-muted-foreground text-sm xs:text-base">thinking</span>
           <span className="thinking-dots text-muted-foreground text-sm xs:text-base">
             <span className="dot">.</span>
@@ -36,14 +36,7 @@ export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicato
           </span>
         </div>
         
-        {iteration > 0 && (
-          <div className="inline-flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 py-0.5 xs:py-1 rounded-md xs:rounded-lg bg-primary/10 border border-primary/20 mt-2 xs:mt-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-            <span className="text-[10px] xs:text-[11px] font-medium text-primary">
-              Iteration {iteration}/{maxIterations}
-            </span>
-          </div>
-        )}
+        
       </div>
     </div>
   );
