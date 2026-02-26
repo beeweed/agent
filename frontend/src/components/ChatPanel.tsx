@@ -3,9 +3,9 @@ import { useStore } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { ModelSelector } from "./ModelSelector";
 import type { AgentEvent, ChatEntry } from "@/types";
 import { 
-  ChevronDown, 
   Send,
   Settings,
   RotateCcw,
@@ -29,7 +29,6 @@ export function ChatPanel() {
     setIsSettingsOpen,
     setIsMemoryOpen,
     apiKey,
-    selectedModel,
     setCodeStreaming,
     resetCodeStreaming,
   } = useStore();
@@ -249,11 +248,6 @@ export function ChatPanel() {
     setCodeStreaming({ isStreaming: false });
   };
 
-  const getModelDisplayName = () => {
-    const modelParts = selectedModel.split("/");
-    return modelParts[modelParts.length - 1] || "Select Model";
-  };
-
   return (
     <div 
       data-design-id="chat-panel"
@@ -356,19 +350,7 @@ export function ChatPanel() {
               
               <div data-design-id="input-actions" className="flex items-center justify-between mt-1 xs:mt-2">
                 <div className="flex items-center gap-1 xs:gap-2">
-                  <button 
-                    data-design-id="model-selector"
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1 xs:py-1.5 rounded-md border border-border bg-muted hover:bg-accent active:bg-accent hover:border-primary/50 transition-all text-[11px] xs:text-[13px]"
-                  >
-                    <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-primary flex items-center justify-center flex-shrink-0">
-                      <svg className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <span className="text-foreground hidden xs:inline truncate max-w-[80px] sm:max-w-none">{getModelDisplayName()}</span>
-                    <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                  </button>
+                  <ModelSelector />
                 </div>
                 
                 <button
