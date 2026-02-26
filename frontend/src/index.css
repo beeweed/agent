@@ -11,8 +11,8 @@
 }
 
 @font-face {
-  font-family: 'JetBrains Mono';
-  src: url('https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2') format('woff2');
+  font-family: 'Fira Code';
+  src: url('https://fonts.gstatic.com/s/firacode/v21/uU9eCBsR6Z2vfE9aq3bL0fxyUs4tcw4W_D1sJVD7MOzlojwUKQ.woff2') format('woff2');
   font-weight: 400 500;
   font-display: swap;
 }
@@ -45,40 +45,40 @@
   --color-ring: var(--ring);
   
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-mono: 'Fira Code', 'SF Mono', monospace;
 }
 
 :root {
   --radius: 0.625rem;
-  --background: #272727;
-  --foreground: #f5f5f5;
-  --card: #2d2d2d;
-  --card-foreground: #f5f5f5;
-  --popover: #323232;
-  --popover-foreground: #f5f5f5;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #3a3a3c;
-  --secondary-foreground: #f5f5f5;
-  --muted: #3a3a3c;
-  --muted-foreground: #a1a1aa;
-  --accent: #22d3ee;
-  --accent-foreground: #ffffff;
+  --background: #f8f8f7;
+  --foreground: #34322d;
+  --card: #ffffff;
+  --card-foreground: #34322d;
+  --popover: #ffffff;
+  --popover-foreground: #34322d;
+  --primary: #ffc700;
+  --primary-foreground: #34322d;
+  --secondary: #f0f0f0;
+  --secondary-foreground: #34322d;
+  --muted: #f5f5f5;
+  --muted-foreground: #858481;
+  --accent: #37352f0a;
+  --accent-foreground: #34322d;
   --destructive: #ef4444;
-  --border: #404040;
-  --input: #363638;
-  --ring: #6366f1;
+  --border: #eeeeee;
+  --input: #ffffff;
+  --ring: #ffc700;
 }
 
 .dark {
-  --background: #272727;
+  --background: #1a1a1a;
   --foreground: #f5f5f5;
   --card: #2d2d2d;
   --card-foreground: #f5f5f5;
   --popover: #323232;
   --popover-foreground: #f5f5f5;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
+  --primary: #ffc700;
+  --primary-foreground: #34322d;
   --secondary: #3a3a3c;
   --secondary-foreground: #f5f5f5;
   --muted: #3a3a3c;
@@ -88,7 +88,7 @@
   --destructive: #ef4444;
   --border: #404040;
   --input: #363638;
-  --ring: #6366f1;
+  --ring: #ffc700;
 }
 
 @layer base {
@@ -97,47 +97,100 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    padding: 0;
+  }
+  html {
+    overflow: hidden;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Light theme */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #404040;
-  border-radius: 4px;
+  background: #d1d1d1;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #505050;
+  background: #b1b1b1;
 }
 
-/* Syntax highlighting - One Dark theme */
-.hljs { background: transparent; color: #abb2bf; }
-.hljs-comment { color: #5c6370; font-style: italic; }
-.hljs-keyword { color: #c678dd; }
-.hljs-string { color: #98c379; }
-.hljs-number { color: #d19a66; }
-.hljs-function { color: #61aeee; }
-.hljs-class { color: #e6c07b; }
-.hljs-tag { color: #e06c75; }
-.hljs-attr { color: #d19a66; }
-.hljs-variable { color: #e06c75; }
-.hljs-built_in { color: #e6c07b; }
-
-/* Inline code */
-code:not(pre code) {
-  background: rgba(99, 102, 241, 0.15);
-  color: #e06c75;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: 'JetBrains Mono', monospace;
+/* Hide scrollbar for message list */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+/* Syntax highlighting - Light theme */
+.hljs { background: transparent; color: #24292e; }
+.hljs-comment { color: #6a737d; font-style: italic; }
+.hljs-keyword { color: #d73a49; }
+.hljs-string { color: #032f62; }
+.hljs-number { color: #005cc5; }
+.hljs-function { color: #6f42c1; }
+.hljs-title { color: #6f42c1; }
+.hljs-class { color: #22863a; }
+.hljs-tag { color: #22863a; }
+.hljs-attr { color: #005cc5; }
+.hljs-variable { color: #e36209; }
+.hljs-built_in { color: #005cc5; }
+.hljs-params { color: #24292e; }
+.hljs-literal { color: #005cc5; }
+
+/* Code line styles */
+.code-line {
+  display: flex;
+  min-height: 1.5em;
+}
+
+.line-number {
+  min-width: 40px;
+  padding-right: 16px;
+  text-align: right;
+  color: #999;
+  user-select: none;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.line-content {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.line-added {
+  background: rgba(46, 160, 67, 0.15);
+}
+
+.line-removed {
+  background: rgba(248, 81, 73, 0.15);
+}
+
+/* Loading animation */
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+.loading-dot {
+  width: 4px;
+  height: 4px;
+  background: #666;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dot:nth-child(1) { animation-delay: -0.32s; }
+.loading-dot:nth-child(2) { animation-delay: -0.16s; }
 
 /* Thinking animation */
 @keyframes thinking-wave {
@@ -153,22 +206,12 @@ code:not(pre code) {
 
 /* Pulse glow animation */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-  50% { box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.3); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 199, 0, 0.4); }
+  50% { box-shadow: 0 0 20px 4px rgba(255, 199, 0, 0.3); }
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Slide in animation */
-@keyframes slide-in-right {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(0); }
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
 }
 
 /* Fade in animation */
@@ -181,14 +224,37 @@ code:not(pre code) {
   animation: fade-in 0.3s ease-out;
 }
 
-/* File card shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* Slide in from right */
+@keyframes slide-in-right {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
 }
 
-.shimmer-bg {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2s linear infinite;
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #1890ff;
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+}
+
+/* Realtime dot pulse */
+@keyframes realtime-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.realtime-dot-pulse {
+  animation: realtime-pulse 2s ease-in-out infinite;
 }

@@ -1,47 +1,111 @@
 import { useStore } from "@/store/useStore";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FilePanel } from "@/components/FilePanel";
+import { ComputerPanel } from "@/components/ComputerPanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { MemorySidebar } from "@/components/MemorySidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { Monitor, FolderOpen, MessageSquare } from "lucide-react";
 
 function App() {
-  const { mobileTab, setMobileTab } = useStore();
+  const { mobileTab, setMobileTab, rightPanel, setRightPanel } = useStore();
 
   return (
-    <div data-design-id="app-container" className="h-screen w-screen overflow-hidden bg-[#272727]">
-      {/* Desktop Layout */}
-      <div data-design-id="desktop-layout" className="hidden md:flex h-full bg-[#191919]">
-        {/* Left Side: Chat Panel */}
+    <div data-design-id="app-container" className="h-screen w-screen overflow-hidden bg-background">
+      <script
+        data-design-ignore="true"
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              if (window === window.parent || window.__DESIGN_NAV_REPORTER__) return;
+              window.__DESIGN_NAV_REPORTER__ = true;
+              function report() {
+                try { window.parent.postMessage({ type: 'IFRAME_URL_CHANGE', payload: { url: location.origin + location.pathname + location.hash } }, '*'); } catch(e) {}
+              }
+              report();
+              var ps = history.pushState, rs = history.replaceState;
+              history.pushState = function() { ps.apply(this, arguments); report(); };
+              history.replaceState = function() { rs.apply(this, arguments); report(); };
+              window.addEventListener('popstate', report);
+              window.addEventListener('hashchange', report);
+              window.addEventListener('load', report);
+            })();
+          `,
+        }}
+      />
+      
+      <div data-design-id="desktop-layout" className="hidden md:flex h-full">
         <div 
           data-design-id="chat-panel-container"
-          className="w-[440px] min-w-[380px] max-w-[520px] shrink-0 lg:w-[40%]"
+          className="w-1/2 h-full flex flex-col px-5 overflow-hidden"
         >
           <ChatPanel />
         </div>
 
-        {/* Right Side: File Panel */}
-        <FilePanel />
+        <div 
+          data-design-id="right-panel-container"
+          className="w-1/2 h-full p-3.5 pl-0"
+        >
+          <div className="h-full rounded-[18px] bg-card shadow-lg border border-border overflow-hidden flex flex-col">
+            <div 
+              data-design-id="right-panel-header"
+              className="flex items-center justify-between px-4 py-3 border-b border-border"
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  data-design-id="computer-tab-btn"
+                  onClick={() => setRightPanel("computer")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    rightPanel === "computer"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Monitor className="w-4 h-4" />
+                  Computer
+                </button>
+                <button
+                  data-design-id="files-tab-btn"
+                  onClick={() => setRightPanel("files")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    rightPanel === "files"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Files
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              {rightPanel === "computer" ? (
+                <ComputerPanel />
+              ) : (
+                <FilePanel />
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Mobile Layout */}
       <div data-design-id="mobile-layout" className="md:hidden flex flex-col h-full">
-        {/* Content Area */}
         <div className="flex-1 overflow-hidden">
           {mobileTab === "chat" ? (
-            <div className="h-full">
+            <div className="h-full px-4">
               <ChatPanel />
             </div>
           ) : (
-            <div className="h-full flex">
+            <div className="h-full">
               <FilePanel />
             </div>
           )}
         </div>
 
-        {/* Mobile Tab Bar */}
-        <div data-design-id="mobile-tab-bar" className="flex h-14 bg-[#232323] border-t border-border/30">
+        <div data-design-id="mobile-tab-bar" className="flex h-14 bg-card border-t border-border">
           <button
+            data-design-id="mobile-chat-tab"
             onClick={() => setMobileTab("chat")}
             className={`flex-1 flex items-center justify-center gap-2 transition-colors ${
               mobileTab === "chat"
@@ -49,17 +113,11 @@ function App() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
+            <MessageSquare className="w-5 h-5" />
             <span className="text-sm font-medium">Chat</span>
           </button>
           <button
+            data-design-id="mobile-files-tab"
             onClick={() => setMobileTab("files")}
             className={`flex-1 flex items-center justify-center gap-2 transition-colors ${
               mobileTab === "files"
@@ -67,20 +125,12 @@ function App() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-            </svg>
+            <FolderOpen className="w-5 h-5" />
             <span className="text-sm font-medium">Files</span>
           </button>
         </div>
       </div>
 
-      {/* Dialogs and Overlays */}
       <SettingsDialog />
       <MemorySidebar />
       <Toaster position="bottom-right" />

@@ -2,6 +2,14 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ChatEntry, FileNode, Model, Memory } from "@/types";
 
+export interface CodeStreamingState {
+  filePath: string;
+  content: string;
+  isStreaming: boolean;
+  tool: string;
+  action: string;
+}
+
 interface AppState {
   apiKey: string;
   setApiKey: (key: string) => void;
@@ -51,7 +59,23 @@ interface AppState {
   
   mobileTab: "chat" | "files";
   setMobileTab: (tab: "chat" | "files") => void;
+  
+  rightPanel: "computer" | "files";
+  setRightPanel: (panel: "computer" | "files") => void;
+  
+  codeStreaming: CodeStreamingState;
+  setCodeStreaming: (state: Partial<CodeStreamingState>) => void;
+  resetCodeStreaming: () => void;
+  appendStreamingCode: (content: string) => void;
 }
+
+const initialCodeStreamingState: CodeStreamingState = {
+  filePath: "",
+  content: "",
+  isStreaming: false,
+  tool: "",
+  action: "",
+};
 
 export const useStore = create<AppState>()(
   persist(
@@ -119,6 +143,24 @@ export const useStore = create<AppState>()(
       
       mobileTab: "chat",
       setMobileTab: (tab) => set({ mobileTab: tab }),
+      
+      rightPanel: "computer",
+      setRightPanel: (panel) => set({ rightPanel: panel }),
+      
+      codeStreaming: initialCodeStreamingState,
+      setCodeStreaming: (state) =>
+        set((prev) => ({
+          codeStreaming: { ...prev.codeStreaming, ...state },
+        })),
+      resetCodeStreaming: () =>
+        set({ codeStreaming: initialCodeStreamingState }),
+      appendStreamingCode: (content) =>
+        set((state) => ({
+          codeStreaming: {
+            ...state.codeStreaming,
+            content: state.codeStreaming.content + content,
+          },
+        })),
     }),
     {
       name: "vibe-coder-storage",

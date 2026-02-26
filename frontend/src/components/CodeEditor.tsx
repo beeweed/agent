@@ -10,7 +10,7 @@ import markdown from "highlight.js/lib/languages/markdown";
 import bash from "highlight.js/lib/languages/bash";
 import sql from "highlight.js/lib/languages/sql";
 import yaml from "highlight.js/lib/languages/yaml";
-import "highlight.js/styles/github-dark.css";
+import "highlight.js/styles/github.css";
 
 hljs.registerLanguage("typescript", typescript);
 hljs.registerLanguage("javascript", javascript);
@@ -58,7 +58,6 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
   };
 
   const language = getLanguage(filePath);
-  const lines = content.split("\n");
 
   const highlightedCode = useMemo(() => {
     try {
@@ -85,21 +84,21 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
   return (
     <div 
       data-design-id="code-editor" 
-      className="flex-1 h-full overflow-hidden flex flex-col bg-[#0d1117]"
+      className="flex-1 h-full overflow-hidden flex flex-col bg-[#f5f5f5]"
     >
       <div 
         data-design-id="code-editor-header"
-        className="flex items-center justify-between px-4 py-2 border-b border-[#30363d] bg-[#161b22]"
+        className="flex items-center justify-between px-4 py-2 border-b border-border bg-card"
       >
         <span 
           data-design-id="code-editor-filename"
-          className="text-xs text-[#8b949e] font-mono"
+          className="text-xs text-muted-foreground font-mono"
         >
           {filePath.split("/").pop()}
         </span>
         <span 
           data-design-id="code-editor-language"
-          className="text-xs px-2 py-0.5 rounded bg-[#238636]/20 text-[#3fb950] uppercase tracking-wide"
+          className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 uppercase tracking-wide"
         >
           {language}
         </span>
@@ -108,11 +107,7 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
       <div 
         ref={codeRef as React.RefObject<HTMLDivElement>}
         data-design-id="code-editor-scroll-container"
-        className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-[#30363d] scrollbar-track-transparent"
-        style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "#30363d transparent",
-        }}
+        className="flex-1 overflow-auto"
       >
         <div className="min-w-max">
           <pre 
@@ -129,11 +124,11 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
                 <div 
                   key={i} 
                   data-design-id={`code-line-${i}`}
-                  className="flex hover:bg-[#161b22] transition-colors"
+                  className="flex hover:bg-[#e8e8e8] transition-colors"
                 >
                   <span 
                     data-design-id={`line-number-${i}`}
-                    className="w-12 text-right pr-4 text-[#484f58] select-none flex-shrink-0 border-r border-[#30363d] mr-4"
+                    className="w-12 text-right pr-4 text-[#999] select-none flex-shrink-0 border-r border-[#ddd] mr-4"
                   >
                     {i + 1}
                   </span>

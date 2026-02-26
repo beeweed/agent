@@ -4,6 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileTree } from "./FileTree";
 import { CodeEditor } from "./CodeEditor";
+import { FolderOpen, RefreshCw, X, ChevronRight } from "lucide-react";
 
 export function FilePanel() {
   const { fileTree, selectedFile, fileContent, setFileContent, openTabs, setSelectedFile, removeTab } = useStore();
@@ -27,37 +28,21 @@ export function FilePanel() {
   const getFileIcon = (filename: string) => {
     const ext = filename.split(".").pop()?.toLowerCase();
     
-    if (["tsx", "ts", "jsx", "js"].includes(ext || "")) {
-      return (
-        <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-        </svg>
-      );
-    }
-    if (["css", "scss", "sass"].includes(ext || "")) {
-      return (
-        <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    }
-    if (["json"].includes(ext || "")) {
-      return (
-        <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    }
-    if (["py"].includes(ext || "")) {
-      return (
-        <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-        </svg>
-      );
-    }
+    const colors: Record<string, string> = {
+      tsx: "text-blue-500",
+      ts: "text-blue-500",
+      jsx: "text-yellow-500",
+      js: "text-yellow-500",
+      css: "text-purple-500",
+      scss: "text-pink-500",
+      json: "text-yellow-600",
+      py: "text-green-500",
+      html: "text-orange-500",
+      md: "text-gray-500",
+    };
     
     return (
-      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className={`w-4 h-4 ${colors[ext || ""] || "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     );
@@ -71,26 +56,19 @@ export function FilePanel() {
   };
 
   return (
-    <div data-design-id="file-panel" className="flex-1 min-w-0 flex h-full">
-      {/* File Explorer Sidebar */}
-      <div data-design-id="file-explorer" className="w-56 lg:w-64 bg-[#232323] border-r border-border/30 flex flex-col">
-        <div className="flex items-center justify-between px-3 py-3 border-b border-border/50">
+    <div data-design-id="file-panel" className="flex h-full">
+      <div data-design-id="file-explorer" className="w-56 bg-secondary/50 border-r border-border flex flex-col">
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
+            <FolderOpen className="w-4 h-4 text-muted-foreground" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Explorer</span>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => fetchFileTree()}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={() => fetchFileTree()}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
         </div>
         
         <ScrollArea className="flex-1">
@@ -106,32 +84,28 @@ export function FilePanel() {
         </ScrollArea>
       </div>
       
-      {/* Code Editor Area */}
-      <div data-design-id="code-editor-area" className="flex-1 flex flex-col min-w-0 bg-[#1e1e1e]">
-        {/* Editor Tabs Bar */}
-        <div className="flex items-center h-10 bg-[#1e1e1e] border-b border-border/30 px-2 gap-1 overflow-x-auto">
+      <div data-design-id="code-editor-area" className="flex-1 flex flex-col min-w-0 bg-[#f8f8f7]">
+        <div className="flex items-center h-10 bg-card border-b border-border px-2 gap-1 overflow-x-auto">
           {openTabs.map((tab) => (
             <div
               key={tab}
               onClick={() => setSelectedFile(tab)}
-              className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-t-lg transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-t-lg transition-colors text-sm ${
                 selectedFile === tab
-                  ? "bg-background border-t-2 border-t-primary"
-                  : "text-muted-foreground hover:bg-white/5"
+                  ? "bg-background border-t-2 border-t-primary text-foreground"
+                  : "text-muted-foreground hover:bg-accent"
               }`}
             >
               {getFileIcon(tab)}
-              <span className="text-xs font-medium truncate max-w-[100px]">{getFileName(tab)}</span>
+              <span className="truncate max-w-[100px]">{getFileName(tab)}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   removeTab(tab);
                 }}
-                className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-3 h-3" />
               </button>
             </div>
           ))}
@@ -139,27 +113,20 @@ export function FilePanel() {
         
         {selectedFile ? (
           <>
-            {/* Breadcrumb */}
-            <div className="flex items-center h-7 px-4 bg-[#1e1e1e] border-b border-border/20">
+            <div className="flex items-center h-7 px-4 bg-card border-b border-border">
               <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
                 {getBreadcrumb(selectedFile).map((part, i, arr) => (
                   <span key={i} className="flex items-center gap-1.5">
                     <span className={i === arr.length - 1 ? "text-foreground" : ""}>{part}</span>
-                    {i < arr.length - 1 && (
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    )}
+                    {i < arr.length - 1 && <ChevronRight className="w-3 h-3" />}
                   </span>
                 ))}
               </div>
             </div>
             
-            {/* Code Content */}
             <CodeEditor content={fileContent} filePath={selectedFile} />
             
-            {/* Status Bar */}
-            <div className="flex items-center justify-between h-6 px-3 bg-[#232323] border-t border-border/30 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between h-6 px-3 bg-card border-t border-border text-[10px] text-muted-foreground">
               <div className="flex items-center gap-4">
                 <span>{getFileType(selectedFile)}</span>
                 <span>UTF-8</span>
@@ -173,8 +140,8 @@ export function FilePanel() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent flex items-center justify-center">
+                <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
