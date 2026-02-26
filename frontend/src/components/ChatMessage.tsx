@@ -1,6 +1,7 @@
 import type { ChatEntry } from "@/types";
 import { useStore } from "@/store/useStore";
 import { Code, Eye, Check, Loader2, AlertCircle } from "lucide-react";
+import { MessageContent } from "./MessageContent";
 
 function AnygentLogo() {
   return (
@@ -39,7 +40,7 @@ export function ChatMessage({ entry }: ChatMessageProps) {
           data-design-id="user-content"
           className="flex-1 px-3 xs:px-4 py-2 xs:py-3 bg-card rounded-xl xs:rounded-2xl border border-border text-xs xs:text-sm leading-relaxed text-foreground"
         >
-          <p className="whitespace-pre-wrap break-words">{entry.content}</p>
+          <div className="whitespace-pre-wrap break-words">{entry.content}</div>
         </div>
       </div>
     );
@@ -67,12 +68,12 @@ export function ChatMessage({ entry }: ChatMessageProps) {
           )}
         </div>
         
-        {/* Response content below */}
-        <div className="text-sm xs:text-base sm:text-lg leading-relaxed text-foreground whitespace-pre-wrap break-words">
-          {entry.content}
-          {entry.isStreaming && (
-            <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse" />
-          )}
+        {/* Response content with rich rendering */}
+        <div className="text-sm xs:text-base leading-relaxed text-foreground">
+          <MessageContent 
+            content={entry.content || ""} 
+            isStreaming={entry.isStreaming} 
+          />
         </div>
       </div>
     );

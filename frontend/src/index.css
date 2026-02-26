@@ -201,21 +201,43 @@
   scrollbar-width: none;
 }
 
-/* Syntax highlighting - Light theme */
-.hljs { background: transparent; color: #24292e; }
-.hljs-comment { color: #6a737d; font-style: italic; }
-.hljs-keyword { color: #d73a49; }
-.hljs-string { color: #032f62; }
-.hljs-number { color: #005cc5; }
-.hljs-function { color: #6f42c1; }
-.hljs-title { color: #6f42c1; }
-.hljs-class { color: #22863a; }
-.hljs-tag { color: #22863a; }
-.hljs-attr { color: #005cc5; }
-.hljs-variable { color: #e36209; }
-.hljs-built_in { color: #005cc5; }
-.hljs-params { color: #24292e; }
-.hljs-literal { color: #005cc5; }
+/* Syntax highlighting - VS Code Dark+ inspired */
+.hljs { 
+  background: transparent !important; 
+  color: #d4d4d4; 
+  font-family: 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+.hljs-comment,
+.hljs-quote { color: #6a9955; font-style: italic; }
+.hljs-keyword,
+.hljs-selector-tag { color: #569cd6; }
+.hljs-string,
+.hljs-template-literal { color: #ce9178; }
+.hljs-number,
+.hljs-literal { color: #b5cea8; }
+.hljs-function { color: #dcdcaa; }
+.hljs-title,
+.hljs-title.function_ { color: #dcdcaa; }
+.hljs-class,
+.hljs-title.class_ { color: #4ec9b0; }
+.hljs-tag { color: #569cd6; }
+.hljs-attr,
+.hljs-attribute { color: #9cdcfe; }
+.hljs-variable,
+.hljs-template-variable { color: #9cdcfe; }
+.hljs-built_in { color: #4ec9b0; }
+.hljs-params { color: #9cdcfe; }
+.hljs-type { color: #4ec9b0; }
+.hljs-regexp { color: #d16969; }
+.hljs-symbol { color: #b5cea8; }
+.hljs-meta { color: #c586c0; }
+.hljs-punctuation { color: #d4d4d4; }
+.hljs-operator { color: #d4d4d4; }
+.hljs-property { color: #9cdcfe; }
+.hljs-deletion { color: #ce9178; background: rgba(244, 67, 54, 0.15); }
+.hljs-addition { color: #b5cea8; background: rgba(76, 175, 80, 0.15); }
+.hljs-selector-class { color: #d7ba7d; }
+.hljs-selector-id { color: #d7ba7d; }
 
 /* Code line styles */
 .code-line {
@@ -351,3 +373,51 @@
 .thinking-dots .dot:nth-child(6) { animation-delay: 0.75s; }
 .thinking-dots .dot:nth-child(7) { animation-delay: 0.9s; }
 .thinking-dots .dot:nth-child(8) { animation-delay: 1.05s; }
+
+/* Message content styles */
+.message-content p:first-child {
+  margin-top: 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content pre {
+  margin: 0;
+}
+
+.message-content code {
+  font-family: 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+/* Table styles for markdown */
+.message-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.message-content th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.message-content tr:nth-child(even) {
+  background: var(--accent);
+}
+
+/* Image styles */
+.message-content img {
+  max-width: 100%;
+  border-radius: 0.75rem;
+  margin: 0.5rem 0;
+}
