@@ -93,8 +93,12 @@ function App() {
       <div data-design-id="mobile-layout" className="md:hidden flex flex-col h-full">
         <div className="flex-1 overflow-hidden">
           {mobileTab === "chat" ? (
-            <div className="h-full px-4">
+            <div className="h-full px-3 sm:px-4">
               <ChatPanel />
+            </div>
+          ) : mobileTab === "computer" ? (
+            <div className="h-full">
+              <ComputerPanel />
             </div>
           ) : (
             <div className="h-full">
@@ -103,30 +107,42 @@ function App() {
           )}
         </div>
 
-        <div data-design-id="mobile-tab-bar" className="flex h-14 bg-card border-t border-border">
+        <div data-design-id="mobile-tab-bar" className="flex h-14 bg-card border-t border-border safe-area-bottom">
           <button
             data-design-id="mobile-chat-tab"
             onClick={() => setMobileTab("chat")}
-            className={`flex-1 flex items-center justify-center gap-2 transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 transition-colors ${
               mobileTab === "chat"
                 ? "text-primary bg-primary/10"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <MessageSquare className="w-5 h-5" />
-            <span className="text-sm font-medium">Chat</span>
+            <span className="text-xs sm:text-sm font-medium">Chat</span>
+          </button>
+          <button
+            data-design-id="mobile-computer-tab"
+            onClick={() => setMobileTab("computer")}
+            className={`flex-1 flex items-center justify-center gap-1.5 transition-colors ${
+              mobileTab === "computer"
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Monitor className="w-5 h-5" />
+            <span className="text-xs sm:text-sm font-medium">Computer</span>
           </button>
           <button
             data-design-id="mobile-files-tab"
             onClick={() => setMobileTab("files")}
-            className={`flex-1 flex items-center justify-center gap-2 transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 transition-colors ${
               mobileTab === "files"
                 ? "text-primary bg-primary/10"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <FolderOpen className="w-5 h-5" />
-            <span className="text-sm font-medium">Files</span>
+            <span className="text-xs sm:text-sm font-medium">Files</span>
           </button>
         </div>
       </div>

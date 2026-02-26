@@ -65,7 +65,7 @@ export function SettingsDialog() {
             </div>
             <div>
               <DialogTitle data-design-id="settings-title">Settings</DialogTitle>
-              <p className="text-xs text-muted-foreground">Configure your Vibe Coder</p>
+              <p className="text-xs text-muted-foreground">Configure your Anygent</p>
             </div>
           </div>
         </DialogHeader>

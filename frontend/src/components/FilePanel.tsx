@@ -56,8 +56,8 @@ export function FilePanel() {
   };
 
   return (
-    <div data-design-id="file-panel" className="flex h-full">
-      <div data-design-id="file-explorer" className="w-56 bg-secondary/50 border-r border-border flex flex-col">
+    <div data-design-id="file-panel" className="flex flex-col sm:flex-row h-full">
+      <div data-design-id="file-explorer" className="w-full sm:w-48 md:w-56 h-1/3 sm:h-full bg-secondary/50 border-b sm:border-b-0 sm:border-r border-border flex flex-col flex-shrink-0">
         <div className="flex items-center justify-between px-3 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-muted-foreground" />

@@ -57,8 +57,8 @@ interface AppState {
   isMemoryOpen: boolean;
   setIsMemoryOpen: (open: boolean) => void;
   
-  mobileTab: "chat" | "files";
-  setMobileTab: (tab: "chat" | "files") => void;
+  mobileTab: "chat" | "computer" | "files";
+  setMobileTab: (tab: "chat" | "computer" | "files") => void;
   
   rightPanel: "computer" | "files";
   setRightPanel: (panel: "computer" | "files") => void;
@@ -163,7 +163,7 @@ export const useStore = create<AppState>()(
         })),
     }),
     {
-      name: "vibe-coder-storage",
+      name: "anygent-storage",
       partialize: (state) => ({
         apiKey: state.apiKey,
         selectedModel: state.selectedModel,

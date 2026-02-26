@@ -6,10 +6,7 @@ import { ThinkingIndicator } from "./ThinkingIndicator";
 import type { AgentEvent, ChatEntry } from "@/types";
 import { 
   Share2, 
-  Paperclip, 
   ChevronDown, 
-  Bot, 
-  Cloud,
   Send,
   Settings,
   RotateCcw,
@@ -228,21 +225,24 @@ export function ChatPanel() {
     >
       <div 
         data-design-id="chat-header"
-        className="flex items-center justify-between py-4 border-b border-border"
+        className="flex items-center justify-between py-3 sm:py-4 border-b border-border"
       >
-        <div className="flex items-center gap-3">
-          <h1 data-design-id="chat-title" className="text-base font-semibold text-foreground truncate max-w-[300px]">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-xs sm:text-sm">A</span>
+          </div>
+          <h1 data-design-id="chat-title" className="text-sm sm:text-base font-semibold text-foreground truncate max-w-[150px] sm:max-w-[300px]">
             {chatEntries.length > 0 && chatEntries[0].type === "user" 
               ? (chatEntries[0].content?.slice(0, 40) + (chatEntries[0].content && chatEntries[0].content.length > 40 ? "..." : ""))
-              : "New Conversation"
+              : "Anygent"
             }
           </h1>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
           <button 
             data-design-id="memory-btn"
             onClick={() => setIsMemoryOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Memory"
           >
             <Lightbulb className="w-4 h-4" />
@@ -250,14 +250,14 @@ export function ChatPanel() {
           <button 
             data-design-id="reset-btn"
             onClick={handleReset}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Reset"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
           <button 
             data-design-id="share-btn"
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors hidden sm:flex"
             title="Share"
           >
             <Share2 className="w-4 h-4" />
@@ -265,7 +265,7 @@ export function ChatPanel() {
           <button 
             data-design-id="settings-btn"
             onClick={() => setIsSettingsOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -309,13 +309,13 @@ export function ChatPanel() {
         <div data-design-id="input-wrapper" className="w-full">
           <div 
             data-design-id="input-area"
-            className="flex flex-col min-h-[140px] p-5 pb-3 rounded-2xl bg-card shadow-sm border border-border"
+            className="flex flex-col min-h-[120px] sm:min-h-[140px] p-3 sm:p-5 pb-3 rounded-xl sm:rounded-2xl bg-card shadow-sm border border-border"
           >
             <div className="flex-1 flex flex-col justify-between">
               <textarea
                 ref={textareaRef}
                 data-design-id="chat-textarea"
-                placeholder="Ask Lemon AI to help you with coding tasks..."
+                placeholder="Ask Anygent to help you with any task..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -327,37 +327,13 @@ export function ChatPanel() {
               <div data-design-id="input-actions" className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2">
                   <button 
-                    data-design-id="attach-btn"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-card text-muted-foreground hover:border-muted-foreground hover:bg-secondary transition-all text-[13px]"
-                  >
-                    <Paperclip className="w-4 h-4" />
-                  </button>
-                  
-                  <button 
                     data-design-id="model-selector"
                     onClick={() => setIsSettingsOpen(true)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:border-muted-foreground transition-all text-[13px]"
                   >
                     <div className="w-[18px] h-[18px] rounded bg-gradient-to-br from-indigo-500 to-purple-600" />
-                    <span className="text-foreground">{getModelDisplayName()}</span>
+                    <span className="text-foreground hidden sm:inline">{getModelDisplayName()}</span>
                     <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                  </button>
-                  
-                  <button 
-                    data-design-id="mode-selector"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:border-muted-foreground transition-all text-[13px]"
-                  >
-                    <Bot className="w-4 h-4 text-primary" />
-                    <span className="text-foreground">Evolving Agent</span>
-                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                  </button>
-                  
-                  <button 
-                    data-design-id="mcp-btn"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-card text-muted-foreground hover:border-muted-foreground hover:bg-secondary transition-all text-[13px]"
-                  >
-                    <Cloud className="w-4 h-4" />
-                    MCP
                   </button>
                 </div>
                 
