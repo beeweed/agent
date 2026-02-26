@@ -54,7 +54,7 @@ export function SettingsDialog() {
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
       <DialogContent 
         data-design-id="settings-dialog"
-        className="sm:max-w-lg bg-[#2d2d2d] border-border/30"
+        className="w-[95vw] max-w-[95vw] xs:w-[90vw] xs:max-w-[90vw] sm:max-w-lg bg-[#2d2d2d] border-border/30 p-4 xs:p-6 rounded-xl"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export function SettingsDialog() {
             </div>
 
             {/* Model List */}
-            <div className="bg-[#363638] rounded-xl h-[200px] overflow-hidden">
+            <div className="bg-[#363638] rounded-lg xs:rounded-xl h-[150px] xs:h-[180px] sm:h-[200px] overflow-hidden">
               <ScrollArea className="h-full p-2">
                 {modelsLoading ? (
                   <div className="flex items-center justify-center py-8">

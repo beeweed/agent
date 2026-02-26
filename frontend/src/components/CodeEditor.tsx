@@ -88,17 +88,17 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
     >
       <div 
         data-design-id="code-editor-header"
-        className="flex items-center justify-between px-4 py-2 border-b border-border bg-card"
+        className="flex items-center justify-between px-2 xs:px-3 sm:px-4 py-1.5 xs:py-2 border-b border-border bg-card"
       >
         <span 
           data-design-id="code-editor-filename"
-          className="text-xs text-muted-foreground font-mono"
+          className="text-[10px] xs:text-xs text-muted-foreground font-mono truncate max-w-[120px] xs:max-w-[200px] sm:max-w-none"
         >
           {filePath.split("/").pop()}
         </span>
         <span 
           data-design-id="code-editor-language"
-          className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 uppercase tracking-wide"
+          className="text-[9px] xs:text-xs px-1.5 xs:px-2 py-0.5 rounded bg-green-100 text-green-700 uppercase tracking-wide flex-shrink-0"
         >
           {language}
         </span>
@@ -112,7 +112,7 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
         <div className="min-w-max">
           <pre 
             data-design-id="code-editor-pre"
-            className="p-4 font-mono text-[13px] leading-6 m-0"
+            className="p-2 xs:p-3 sm:p-4 font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-4 xs:leading-5 sm:leading-6 m-0"
             style={{ background: "transparent" }}
           >
             <code 
@@ -128,7 +128,7 @@ export function CodeEditor({ content, filePath }: CodeEditorProps) {
                 >
                   <span 
                     data-design-id={`line-number-${i}`}
-                    className="w-12 text-right pr-4 text-[#999] select-none flex-shrink-0 border-r border-[#ddd] mr-4"
+                    className="w-8 xs:w-10 sm:w-12 text-right pr-2 xs:pr-3 sm:pr-4 text-[#999] select-none flex-shrink-0 border-r border-[#ddd] mr-2 xs:mr-3 sm:mr-4"
                   >
                     {i + 1}
                   </span>
