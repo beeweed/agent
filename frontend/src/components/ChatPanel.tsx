@@ -67,12 +67,50 @@ export function ChatPanel() {
     resetCodeStreaming();
 
     let currentFileCardId: string | null = null;
+    let currentThoughtId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
         switch (event.type) {
           case "iteration":
             setCurrentIteration(event.iteration || 0);
+            break;
+          
+          case "thought_stream_start":
+            {
+              const thoughtEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "assistant",
+                content: "",
+                iteration: event.iteration,
+                timestamp: new Date(),
+                isStreaming: true,
+              };
+              currentThoughtId = thoughtEntry.id;
+              addChatEntry(thoughtEntry);
+            }
+            break;
+            
+          case "thought_stream_chunk":
+            if (currentThoughtId && event.chunk) {
+              const store = useStore.getState();
+              const entry = store.chatEntries.find(e => e.id === currentThoughtId);
+              if (entry) {
+                updateChatEntry(currentThoughtId, {
+                  content: (entry.content || "") + event.chunk,
+                });
+              }
+            }
+            break;
+            
+          case "thought_stream_end":
+            if (currentThoughtId) {
+              updateChatEntry(currentThoughtId, {
+                content: event.content || "",
+                isStreaming: false,
+              });
+              currentThoughtId = null;
+            }
             break;
             
           case "thought":

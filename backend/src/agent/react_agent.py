@@ -261,6 +261,7 @@ class ReActAgent:
                 has_tool_calls = False
                 finish_reason = None
                 streaming_started = {}
+                thought_stream_started = False
                 
                 async for chunk_event in chat_completion(
                     api_key=self.api_key,
@@ -288,6 +289,19 @@ class ReActAgent:
                     
                     if parsed["content_delta"]:
                         accumulated_content += parsed["content_delta"]
+                        
+                        if not thought_stream_started:
+                            thought_stream_started = True
+                            yield {
+                                "type": "thought_stream_start",
+                                "iteration": self.current_iteration
+                            }
+                        
+                        yield {
+                            "type": "thought_stream_chunk",
+                            "chunk": parsed["content_delta"],
+                            "iteration": self.current_iteration
+                        }
                     
                     if parsed["finish_reason"]:
                         finish_reason = parsed["finish_reason"]
@@ -324,7 +338,13 @@ class ReActAgent:
                                     "iteration": self.current_iteration
                                 }
                 
-                if accumulated_content:
+                if thought_stream_started:
+                    yield {
+                        "type": "thought_stream_end",
+                        "content": accumulated_content,
+                        "iteration": self.current_iteration
+                    }
+                elif accumulated_content:
                     yield {
                         "type": "thought",
                         "content": accumulated_content,

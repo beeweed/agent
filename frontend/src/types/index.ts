@@ -48,6 +48,9 @@ export interface AgentEvent {
     | "iteration_start"
     | "iteration"
     | "thought"
+    | "thought_stream_start"
+    | "thought_stream_chunk"
+    | "thought_stream_end"
     | "tool_call"
     | "tool_result"
     | "tool_error"
@@ -114,4 +117,5 @@ export interface ChatEntry {
   arguments?: Record<string, unknown>;
   result?: ToolResult;
   timestamp: Date;
+  isStreaming?: boolean;
 }

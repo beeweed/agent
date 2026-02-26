@@ -60,9 +60,9 @@ export function ChatMessage({ entry }: ChatMessageProps) {
             <span className="text-purple-400">Anygent</span>
             <span className="text-foreground"> AI</span>
           </span>
-          {entry.iteration && (
+          {entry.isStreaming && (
             <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 xs:mt-1">
-              thinking...
+              typing...
             </span>
           )}
         </div>
@@ -70,6 +70,9 @@ export function ChatMessage({ entry }: ChatMessageProps) {
         {/* Response content below */}
         <div className="text-sm xs:text-base sm:text-lg leading-relaxed text-foreground whitespace-pre-wrap break-words">
           {entry.content}
+          {entry.isStreaming && (
+            <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse" />
+          )}
         </div>
       </div>
     );
