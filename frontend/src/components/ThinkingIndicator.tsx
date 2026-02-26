@@ -5,24 +5,11 @@ interface ThinkingIndicatorProps {
 
 function AnygentLogo() {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Modern stylized "A" letter - clean geometric design */}
-      <path 
-        d="M12 2L3 22H7.5L9.5 17H14.5L16.5 22H21L12 2Z" 
-        fill="url(#goldGradientThinking)"
-      />
-      <path 
-        d="M10.5 14L12 9L13.5 14H10.5Z" 
-        fill="#1a1a1a"
-      />
-      <defs>
-        <linearGradient id="goldGradientThinking" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ffe066"/>
-          <stop offset="50%" stopColor="#ffc700"/>
-          <stop offset="100%" stopColor="#e6a800"/>
-        </linearGradient>
-      </defs>
-    </svg>
+    <img 
+      src="/anygent-logo.png" 
+      alt="Anygent AI" 
+      className="w-6 h-6 object-contain"
+    />
   );
 }
 
@@ -31,7 +18,7 @@ export function ThinkingIndicator({ iteration, maxIterations }: ThinkingIndicato
     <div data-design-id="thinking-indicator" className="animate-fade-in">
       <div className="flex items-center gap-2 mb-3">
         <div 
-          className="w-8 h-8 rounded-full bg-[#2d2d2d] border border-primary/30 flex items-center justify-center animate-pulse"
+          className="w-8 h-8 flex items-center justify-center flex-shrink-0 animate-pulse"
         >
           <AnygentLogo />
         </div>
