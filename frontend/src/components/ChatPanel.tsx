@@ -228,8 +228,8 @@ export function ChatPanel() {
         className="flex items-center justify-between py-3 sm:py-4 border-b border-border"
       >
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-xs sm:text-sm">A</span>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <span className="text-primary-foreground font-bold text-xs sm:text-sm">A</span>
           </div>
           <h1 data-design-id="chat-title" className="text-sm sm:text-base font-semibold text-foreground truncate max-w-[150px] sm:max-w-[300px]">
             {chatEntries.length > 0 && chatEntries[0].type === "user" 
@@ -329,9 +329,13 @@ export function ChatPanel() {
                   <button 
                     data-design-id="model-selector"
                     onClick={() => setIsSettingsOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:border-muted-foreground transition-all text-[13px]"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-muted hover:bg-accent hover:border-primary/50 transition-all text-[13px]"
                   >
-                    <div className="w-[18px] h-[18px] rounded bg-gradient-to-br from-indigo-500 to-purple-600" />
+                    <div className="w-[18px] h-[18px] rounded bg-primary flex items-center justify-center">
+                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
                     <span className="text-foreground hidden sm:inline">{getModelDisplayName()}</span>
                     <ChevronDown className="w-3 h-3 text-muted-foreground" />
                   </button>

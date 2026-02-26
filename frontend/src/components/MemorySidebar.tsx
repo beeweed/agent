@@ -140,9 +140,9 @@ export function MemorySidebar() {
       />
 
       {/* Sidebar Panel */}
-      <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] md:w-[480px] lg:w-[520px] bg-[#2d2d2d] shadow-2xl animate-slide-in-right overflow-hidden flex flex-col">
+      <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] md:w-[480px] lg:w-[520px] bg-card shadow-2xl animate-slide-in-right overflow-hidden flex flex-col border-l border-border">
         {/* Header */}
-        <div className="bg-[#232323] px-4 sm:px-6 pt-4 sm:pt-6 pb-4">
+        <div className="bg-background px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
@@ -158,7 +158,7 @@ export function MemorySidebar() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchMemory()}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -166,7 +166,7 @@ export function MemorySidebar() {
               </button>
               <button
                 onClick={() => setIsMemoryOpen(false)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -257,7 +257,7 @@ export function MemorySidebar() {
                 {getTimelineEntries().map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-start gap-3 p-3 rounded-xl bg-[#363638] border border-border/30"
+                    className="flex items-start gap-3 p-3 rounded-xl bg-muted border border-border"
                   >
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -326,8 +326,8 @@ export function MemorySidebar() {
           <TabsContent value="files" data-design-id="files-tab-content" className="flex-1 overflow-hidden mt-0">
             <ScrollArea className="h-full p-4">
               {/* File Type Distribution */}
-              <div data-design-id="file-type-distribution" className="rounded-xl bg-[#363638] border border-border/30 overflow-hidden mb-4">
-                <div className="px-4 py-3 bg-[#2a2a2c] border-b border-border/30">
+              <div data-design-id="file-type-distribution" className="rounded-xl bg-muted border border-border overflow-hidden mb-4">
+                <div className="px-4 py-3 bg-card border-b border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -358,7 +358,7 @@ export function MemorySidebar() {
                                 <span className={`text-xs font-semibold ${info.color}`}>{count}</span>
                               </div>
                             </div>
-                            <div className="h-1.5 bg-[#2a2a2c] rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-background rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ease-out ${info.bgColor.replace('/20', '/60')}`}
                                 style={{ width: `${percentage}%` }}
@@ -381,8 +381,8 @@ export function MemorySidebar() {
               </div>
 
               {/* Files List */}
-              <div data-design-id="files-list" className="rounded-xl bg-[#363638] border border-border/30 overflow-hidden">
-                <div className="px-4 py-3 bg-[#2a2a2c] border-b border-border/30">
+              <div data-design-id="files-list" className="rounded-xl bg-muted border border-border overflow-hidden">
+                <div className="px-4 py-3 bg-card border-b border-border">
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -399,7 +399,7 @@ export function MemorySidebar() {
                           <div
                             key={`${file.path}-${index}`}
                             data-design-id={`file-item-${index}`}
-                            className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#2a2a2c] transition-colors group cursor-default"
+                            className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent transition-colors group cursor-default"
                           >
                             <span className={`w-8 h-8 rounded-lg ${info.bgColor} flex items-center justify-center text-xs font-medium ${info.color} flex-shrink-0`}>
                               {info.icon}
@@ -427,8 +427,8 @@ export function MemorySidebar() {
 
           <TabsContent value="context" className="flex-1 overflow-hidden mt-0">
             <ScrollArea className="h-full p-4">
-              <div className="rounded-xl bg-[#363638] border border-border/30 overflow-hidden">
-                <div className="px-4 py-3 bg-[#2a2a2c] border-b border-border/30">
+              <div className="rounded-xl bg-muted border border-border overflow-hidden">
+                <div className="px-4 py-3 bg-card border-b border-border">
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -468,7 +468,7 @@ export function MemorySidebar() {
                 </div>
               </div>
 
-              <div className="mt-4 p-4 rounded-xl bg-[#363638] border border-border/30">
+              <div className="mt-4 p-4 rounded-xl bg-muted border border-border">
                 <h4 className="text-sm font-medium text-foreground mb-2">Session Info</h4>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
