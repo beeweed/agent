@@ -41,12 +41,12 @@ export function ChatMessage({ entry }: ChatMessageProps) {
         <div className="flex items-center gap-2 mb-3">
           <div 
             data-design-id="assistant-avatar"
-            className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gradient-to-br from-cyan-400/20 to-emerald-400/20"
+            className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center"
           >
             <img 
               src="/ai-robot.png" 
-              alt="AI Assistant" 
-              className="w-8 h-8 object-cover"
+              alt="Anygent AI" 
+              className="w-8 h-8 object-cover rounded-full"
             />
           </div>
           <span data-design-id="assistant-name" className="font-semibold text-sm text-foreground">
@@ -117,14 +117,4 @@ export function ChatMessage({ entry }: ChatMessageProps) {
   }
 
   return null;
-}
-
-function LemonLogo() {
-  return (
-    <svg className="w-6 h-6" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="#FFC700"/>
-      <ellipse cx="50" cy="50" rx="35" ry="40" fill="#FFE066"/>
-      <path d="M50 15C45 10 40 8 35 10C30 12 28 18 30 25" stroke="#7CB342" strokeWidth="4" fill="none"/>
-    </svg>
-  );
 }
