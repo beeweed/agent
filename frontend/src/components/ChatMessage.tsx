@@ -136,37 +136,37 @@ export function ChatMessage({ entry }: ChatMessageProps) {
       <div data-design-id={`read-file-card-${entry.id}`} className="animate-fade-in pl-6 xs:pl-8 sm:pl-10">
         <div
           onClick={() => isRead && entry.filePath && handleFileClick(entry.filePath)}
-          className={`inline-flex flex-wrap items-center gap-1.5 xs:gap-2 px-2 xs:px-3 py-1 xs:py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-[11px] xs:text-sm cursor-pointer transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40 active:bg-blue-100 ${
+          className={`inline-flex flex-wrap items-center gap-1.5 xs:gap-2 px-2 xs:px-3 py-1 xs:py-1.5 rounded-full bg-accent border border-border text-[11px] xs:text-sm cursor-pointer transition-all hover:bg-secondary active:bg-secondary ${
             isReading ? "animate-pulse" : ""
           }`}
         >
           <div className="flex items-center gap-1.5 xs:gap-2">
             {isReading && (
-              <Loader2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-blue-500 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground animate-spin" />
             )}
             {isRead && (
-              <Check className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-blue-600" />
+              <Check className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-green-600" />
             )}
             {isError && (
               <AlertCircle className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-destructive" />
             )}
-            <BookOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-blue-500" />
+            <BookOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground" />
           </div>
           
           <div className="flex items-center gap-1 xs:gap-2 min-w-0">
-            <span className="text-blue-700 dark:text-blue-300 flex-shrink-0">Read</span>
-            <span className="font-mono text-blue-600/80 dark:text-blue-400/80 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none">{entry.filePath}</span>
+            <span className="text-foreground flex-shrink-0">Read</span>
+            <span className="font-mono text-muted-foreground truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none">{entry.filePath}</span>
           </div>
           
           {isRead && entry.readResult && (
-            <span className="text-[10px] xs:text-xs text-blue-500/70 dark:text-blue-400/70">
+            <span className="text-[10px] xs:text-xs text-muted-foreground">
               {entry.readResult.lines_read} lines
             </span>
           )}
           
           {isRead && (
             <button 
-              className="flex items-center gap-1 px-1 xs:px-1.5 py-0.5 rounded text-[10px] xs:text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-100 transition-colors"
+              className="flex items-center gap-1 px-1 xs:px-1.5 py-0.5 rounded text-[10px] xs:text-xs text-muted-foreground hover:text-foreground hover:bg-card active:bg-card transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 if (entry.filePath) handleFileClick(entry.filePath);
