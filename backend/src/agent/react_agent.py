@@ -7,6 +7,7 @@ from .models import ContextWindow, AgentState
 from .system_prompt import get_system_prompt
 from ..services.openrouter import chat_completion, chat_completion_non_streaming
 from ..tools.file_write import file_write, FILE_WRITE_TOOL_DEFINITION
+from ..tools.file_read import file_read, FILE_READ_TOOL_DEFINITION
 
 
 class StreamingToolParser:
@@ -197,10 +198,11 @@ class ReActAgent:
         self.is_running = False
         self.session_id = str(uuid.uuid4())
         
-        self.tools = [FILE_WRITE_TOOL_DEFINITION]
+        self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION]
         
         self.tool_executors = {
-            "file_write": self._execute_file_write
+            "file_write": self._execute_file_write,
+            "Read": self._execute_file_read
         }
     
     def _execute_file_write(self, arguments: dict) -> dict:
@@ -208,6 +210,11 @@ class ReActAgent:
         file_path = arguments.get("file_path", "")
         operations = arguments.get("operations", [])
         return file_write(file_path, operations)
+    
+    def _execute_file_read(self, arguments: dict) -> dict:
+        """Execute the Read tool to read a file."""
+        file_path = arguments.get("file_path", "")
+        return file_read(file_path)
     
     def _get_messages(self) -> list:
         """Get messages for the LLM including system prompt."""
@@ -389,10 +396,32 @@ class ReActAgent:
                         }
                         
                         if tool_name in self.tool_executors:
+                            # Emit read_file_start event before executing Read tool
+                            if tool_name == "Read":
+                                file_path = arguments.get("file_path", "")
+                                yield {
+                                    "type": "read_file_start",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "file_path": file_path,
+                                    "iteration": self.current_iteration
+                                }
+                            
                             result = self.tool_executors[tool_name](arguments)
                             result_str = json.dumps(result)
                             
                             self.context.add_tool_result(tool_id, tool_name, result_str)
+                            
+                            # Emit read_file_end event with content for Read tool
+                            if tool_name == "Read":
+                                yield {
+                                    "type": "read_file_end",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "file_path": arguments.get("file_path", ""),
+                                    "result": result,
+                                    "iteration": self.current_iteration
+                                }
                             
                             yield {
                                 "type": "tool_result",

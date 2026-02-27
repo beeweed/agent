@@ -43,6 +43,20 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export interface ReadFileResult {
+  success: boolean;
+  content?: string;
+  file_path?: string;
+  file_name?: string;
+  file_extension?: string;
+  file_size?: number;
+  total_lines?: number;
+  lines_read?: number;
+  truncated?: boolean;
+  message?: string;
+  error?: string;
+}
+
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -60,7 +74,9 @@ export interface AgentEvent {
     | "stream_end"
     | "code_stream_start"
     | "code_stream_chunk"
-    | "code_stream_end";
+    | "code_stream_end"
+    | "read_file_start"
+    | "read_file_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -68,7 +84,7 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult;
+  result?: ToolResult | ReadFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -108,14 +124,15 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card";
   content?: string;
   filePath?: string;
-  fileStatus?: "writing" | "created" | "error";
+  fileStatus?: "writing" | "created" | "error" | "reading" | "read";
   iteration?: number;
   toolName?: string;
   arguments?: Record<string, unknown>;
   result?: ToolResult;
+  readResult?: ReadFileResult;
   timestamp: Date;
   isStreaming?: boolean;
 }

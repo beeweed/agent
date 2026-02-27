@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -95,8 +95,12 @@ export function ComputerPanel() {
         </div>
         
         <div data-design-id="computer-status" className="flex items-center gap-1.5 xs:gap-2 sm:gap-3">
-          <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
-            {codeStreaming.isStreaming ? (
+          <div className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${
+            codeStreaming.tool === "Reader" ? "bg-blue-100 dark:bg-blue-900/30" : "bg-secondary"
+          }`}>
+            {codeStreaming.tool === "Reader" ? (
+              <BookOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-blue-500" />
+            ) : codeStreaming.isStreaming ? (
               <Code className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : (
               <Monitor className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -104,12 +108,26 @@ export function ComputerPanel() {
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-[10px] xs:text-[11px] sm:text-xs text-muted-foreground">
-              Using <span className="text-foreground/80">{codeStreaming.tool || "Editor"}</span>
+              Using <span className={codeStreaming.tool === "Reader" ? "text-blue-500" : "text-foreground/80"}>{codeStreaming.tool || "Editor"}</span>
             </span>
             {codeStreaming.isStreaming && codeStreaming.filePath && (
-              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent rounded-full text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground border border-border/50 max-w-full">
-                <Play className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
-                <span className="truncate">Editing {codeStreaming.filePath}</span>
+              <div className={`flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full ${
+                codeStreaming.tool === "Reader" 
+                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800" 
+                  : "bg-accent text-muted-foreground border-border/50"
+              }`}>
+                {codeStreaming.tool === "Reader" ? (
+                  <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                ) : (
+                  <Play className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                )}
+                <span className="truncate">{codeStreaming.tool === "Reader" ? "Reading" : "Editing"} {codeStreaming.filePath}</span>
+              </div>
+            )}
+            {!codeStreaming.isStreaming && codeStreaming.content && codeStreaming.tool === "Reader" && (
+              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 bg-blue-50 dark:bg-blue-900/20 rounded-full text-[9px] xs:text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 max-w-full">
+                <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                <span className="truncate">Read {codeStreaming.filePath}</span>
               </div>
             )}
             {!codeStreaming.isStreaming && !codeStreaming.content && (

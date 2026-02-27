@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -67,6 +67,7 @@ export function ChatPanel() {
 
     let currentFileCardId: string | null = null;
     let currentThoughtId: string | null = null;
+    let currentReadFileCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -175,11 +176,72 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+          
+          case "read_file_start":
+            {
+              const filePath = event.file_path || "";
+              console.log("[READ_FILE_START]", filePath);
+              
+              // Show read file content in computer panel
+              setCodeStreaming({
+                filePath,
+                content: "",
+                isStreaming: true,
+                tool: "Reader",
+                action: `Reading ${filePath}`,
+              });
+              
+              // Create read file card entry
+              const readFileEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "read_file_card",
+                filePath,
+                fileStatus: "reading",
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentReadFileCardId = readFileEntry.id;
+              addChatEntry(readFileEntry);
+            }
+            break;
+          
+          case "read_file_end":
+            {
+              const result = event.result as ReadFileResult;
+              console.log("[READ_FILE_END]", event.file_path, result?.success);
+              
+              // Update the read file card with result
+              if (currentReadFileCardId) {
+                updateChatEntry(currentReadFileCardId, {
+                  fileStatus: result?.success ? "read" : "error",
+                  readResult: result,
+                });
+                currentReadFileCardId = null;
+              }
+              
+              // Display the file content in computer panel
+              if (result?.success && result?.content) {
+                setCodeStreaming({
+                  filePath: event.file_path || "",
+                  content: result.content,
+                  isStreaming: false,
+                  tool: "Reader",
+                  action: `Read ${event.file_path}`,
+                });
+              } else {
+                setCodeStreaming({ isStreaming: false });
+              }
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
               updateChatEntry(currentFileCardId, { fileStatus: "error" });
               currentFileCardId = null;
+            }
+            if (currentReadFileCardId) {
+              updateChatEntry(currentReadFileCardId, { fileStatus: "error" });
+              currentReadFileCardId = null;
             }
             setCodeStreaming({ isStreaming: false });
             break;
