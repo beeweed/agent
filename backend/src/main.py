@@ -8,7 +8,7 @@ import asyncio
 
 from .agent.react_agent import ReActAgent
 from .services.openrouter import fetch_models
-from .tools.file_write import get_file_tree, read_file, clear_virtual_fs
+from .services.e2b_sandbox import sandbox_manager
 
 app = FastAPI(title="Vibe Coder API", version="1.0.0")
 
@@ -28,6 +28,7 @@ class ChatRequest(BaseModel):
     api_key: str
     model: str = "anthropic/claude-3.5-sonnet"
     session_id: Optional[str] = None
+    e2b_api_key: Optional[str] = None
 
 
 class ModelsRequest(BaseModel):
@@ -36,6 +37,11 @@ class ModelsRequest(BaseModel):
 
 class FileReadRequest(BaseModel):
     file_path: str
+
+
+class SandboxRequest(BaseModel):
+    e2b_api_key: str
+    session_id: Optional[str] = "default"
 
 
 @app.get("/health")
@@ -56,18 +62,37 @@ async def get_models(request: ModelsRequest):
 async def chat(request: ChatRequest):
     """
     Start a chat with the agent using SSE streaming.
+    Requires E2B API key for sandbox operations.
     """
     session_id = request.session_id or "default"
+    
+    # Validate E2B API key
+    if not request.e2b_api_key:
+        async def error_generator():
+            yield f"data: {json.dumps({'type': 'error', 'error': 'E2B API key is required. Please add it in Settings.'})}\n\n"
+            yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
+        
+        return StreamingResponse(
+            error_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
     
     if session_id not in agents:
         agents[session_id] = ReActAgent(
             api_key=request.api_key,
             model=request.model,
-            max_iterations=500
+            max_iterations=500,
+            e2b_api_key=request.e2b_api_key
         )
     else:
         agents[session_id].api_key = request.api_key
         agents[session_id].model = request.model
+        agents[session_id].e2b_api_key = request.e2b_api_key
     
     agent = agents[session_id]
     
@@ -105,14 +130,11 @@ async def stop_chat(session_id: str = "default"):
 async def reset_chat(session_id: str = "default"):
     """Reset the agent and clear context."""
     if session_id in agents:
-        agents[session_id].reset()
-    
-    clear_result = clear_virtual_fs()
+        await agents[session_id].reset()
     
     return {
         "success": True, 
-        "message": "Agent reset and files cleared",
-        "files_cleared": clear_result.get("success", False)
+        "message": "Agent reset and sandbox cleared"
     }
 
 
@@ -139,25 +161,48 @@ async def get_memory(session_id: str = "default"):
 
 
 @app.get("/api/files")
-async def get_files():
-    """Get the virtual file system tree."""
-    return get_file_tree()
+async def get_files(session_id: str = "default"):
+    """Get the file system tree from E2B sandbox."""
+    return await sandbox_manager.list_files(session_id)
 
 
 @app.post("/api/files/read")
-async def read_file_content(request: FileReadRequest):
-    """Read a file from the virtual file system."""
-    result = read_file(request.file_path)
+async def read_file_content(request: FileReadRequest, session_id: str = "default"):
+    """Read a file from the E2B sandbox."""
+    result = await sandbox_manager.read_file(session_id, request.file_path)
     if not result.get("success"):
         raise HTTPException(status_code=404, detail=result.get("error"))
     return result
 
 
-@app.post("/api/files/clear")
-async def clear_files():
-    """Clear the virtual file system."""
-    result = clear_virtual_fs()
+@app.post("/api/files/refresh")
+async def refresh_files(session_id: str = "default"):
+    """Refresh the file tree from E2B sandbox."""
+    return await sandbox_manager.list_files(session_id)
+
+
+@app.post("/api/sandbox/create")
+async def create_sandbox(request: SandboxRequest):
+    """Create a new E2B sandbox for a session."""
+    result = await sandbox_manager.create_sandbox(
+        request.session_id or "default",
+        request.e2b_api_key
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
     return result
+
+
+@app.get("/api/sandbox/status")
+async def sandbox_status(session_id: str = "default"):
+    """Get E2B sandbox status for a session."""
+    return await sandbox_manager.get_sandbox_status(session_id)
+
+
+@app.post("/api/sandbox/kill")
+async def kill_sandbox(session_id: str = "default"):
+    """Kill E2B sandbox for a session."""
+    return await sandbox_manager.kill_sandbox(session_id)
 
 
 @app.get("/api/status")
@@ -173,10 +218,13 @@ async def get_status(session_id: str = "default"):
         }
     
     agent = agents[session_id]
+    sandbox_status = await sandbox_manager.get_sandbox_status(session_id)
+    
     return {
         "session_id": agent.session_id,
         "is_running": agent.is_running,
         "current_iteration": agent.current_iteration,
         "max_iterations": agent.max_iterations,
-        "status": "running" if agent.is_running else "idle"
+        "status": "running" if agent.is_running else "idle",
+        "sandbox": sandbox_status
     }

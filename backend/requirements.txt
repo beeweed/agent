@@ -13,3 +13,4 @@ python-jose[cryptography]
 python-multipart
 cryptography
 requests
+e2b

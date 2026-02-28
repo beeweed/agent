@@ -76,7 +76,10 @@ export interface AgentEvent {
     | "code_stream_chunk"
     | "code_stream_end"
     | "read_file_start"
-    | "read_file_end";
+    | "read_file_end"
+    | "sandbox_creating"
+    | "sandbox_ready"
+    | "sandbox_error";
   content?: string;
   error?: string;
   iteration?: number;
@@ -124,7 +127,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read";
@@ -135,4 +138,5 @@ export interface ChatEntry {
   readResult?: ReadFileResult;
   timestamp: Date;
   isStreaming?: boolean;
+  sandboxStatus?: "creating" | "ready" | "error";
 }

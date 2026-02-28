@@ -6,8 +6,75 @@ from typing import AsyncGenerator, Optional, Callable
 from .models import ContextWindow, AgentState
 from .system_prompt import get_system_prompt
 from ..services.openrouter import chat_completion, chat_completion_non_streaming
-from ..tools.file_write import file_write, FILE_WRITE_TOOL_DEFINITION
-from ..tools.file_read import file_read, FILE_READ_TOOL_DEFINITION
+from ..services.e2b_sandbox import sandbox_manager
+
+
+# Tool definitions for E2B sandbox operations
+FILE_WRITE_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "file_write",
+        "description": "Creates or writes to a file in the E2B sandbox environment. Use this tool when you need to create new files, write code, save content, or generate any file-based output. The file will be created at the specified path with the provided content. IMPORTANT: All file paths MUST start with /home/user/",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The path where the file should be created, including filename and extension. MUST start with /home/user/. Example: /home/user/project/src/App.tsx, /home/user/project/package.json"
+                },
+                "operations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["write", "append"],
+                                "description": "The type of operation: 'write' to overwrite/create, 'append' to add to existing"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "The content to write to the file"
+                            }
+                        },
+                        "required": ["type", "content"]
+                    },
+                    "description": "List of operations to perform on the file"
+                }
+            },
+            "required": ["file_path", "operations"]
+        }
+    }
+}
+
+FILE_READ_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "Read",
+        "description": """Reads and returns the content of a specified file from the E2B sandbox. Supports text files.
+
+Usage:
+- file_path must start with /home/user/
+- Returns formatted content with line numbers (cat -n format)
+- Use this tool when you need to read existing files
+
+Use this tool when you need to:
+- Read existing files to understand their content
+- Check the current state of a file before making changes
+- Analyze code or configuration files
+- Review file contents for debugging""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Path of the file to read. MUST start with /home/user/. Example: /home/user/project/src/main.py"
+                }
+            },
+            "required": ["file_path"]
+        }
+    }
+}
 
 
 class StreamingToolParser:
@@ -175,7 +242,7 @@ class ContentStreamExtractor:
 
 class ReActAgent:
     """
-    ReAct (Reasoning + Acting) Agent implementation.
+    ReAct (Reasoning + Acting) Agent implementation with E2B sandbox integration.
     
     The agent follows the ReAct pattern:
     1. Thought: Reason about the current state and plan next action
@@ -188,15 +255,18 @@ class ReActAgent:
         self,
         api_key: str,
         model: str = "anthropic/claude-3.5-sonnet",
-        max_iterations: int = 500
+        max_iterations: int = 500,
+        e2b_api_key: str = ""
     ):
         self.api_key = api_key
         self.model = model
         self.max_iterations = max_iterations
+        self.e2b_api_key = e2b_api_key
         self.context = ContextWindow()
         self.current_iteration = 0
         self.is_running = False
         self.session_id = str(uuid.uuid4())
+        self.sandbox_ready = False
         
         self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION]
         
@@ -205,16 +275,75 @@ class ReActAgent:
             "Read": self._execute_file_read
         }
     
-    def _execute_file_write(self, arguments: dict) -> dict:
-        """Execute the file_write tool."""
+    async def _execute_file_write(self, arguments: dict) -> dict:
+        """Execute the file_write tool using E2B sandbox."""
         file_path = arguments.get("file_path", "")
         operations = arguments.get("operations", [])
-        return file_write(file_path, operations)
+        
+        # Ensure path starts with /home/user/
+        if not file_path.startswith("/home/user/"):
+            file_path = f"/home/user/{file_path.lstrip('/')}"
+        
+        # Combine all write operations
+        content = ""
+        for operation in operations:
+            op_type = operation.get("type", "write")
+            op_content = operation.get("content", "")
+            
+            if op_type == "write":
+                content = op_content
+            elif op_type == "append":
+                content += op_content
+        
+        # Write to E2B sandbox
+        result = await sandbox_manager.write_file(
+            self.session_id,
+            file_path,
+            content
+        )
+        
+        return result
     
-    def _execute_file_read(self, arguments: dict) -> dict:
-        """Execute the Read tool to read a file."""
+    async def _execute_file_read(self, arguments: dict) -> dict:
+        """Execute the Read tool using E2B sandbox."""
         file_path = arguments.get("file_path", "")
-        return file_read(file_path)
+        
+        # Ensure path starts with /home/user/
+        if not file_path.startswith("/home/user/"):
+            file_path = f"/home/user/{file_path.lstrip('/')}"
+        
+        result = await sandbox_manager.read_file(
+            self.session_id,
+            file_path
+        )
+        
+        return result
+    
+    async def ensure_sandbox(self) -> dict:
+        """Ensure sandbox is created and running."""
+        if not self.e2b_api_key:
+            return {
+                "success": False,
+                "error": "E2B API key not configured"
+            }
+        
+        # Check if sandbox already exists and is running
+        status = await sandbox_manager.get_sandbox_status(self.session_id)
+        if status.get("exists") and status.get("is_running"):
+            self.sandbox_ready = True
+            return {"success": True, "message": "Sandbox already running"}
+        
+        # Create new sandbox
+        result = await sandbox_manager.create_sandbox(
+            self.session_id,
+            self.e2b_api_key,
+            timeout=300  # 5 minutes
+        )
+        
+        if result.get("success"):
+            self.sandbox_ready = True
+        
+        return result
     
     def _get_messages(self) -> list:
         """Get messages for the LLM including system prompt."""
@@ -241,6 +370,27 @@ class ReActAgent:
         """
         self.is_running = True
         self.current_iteration = 0
+        
+        # Emit sandbox creation event
+        yield {
+            "type": "sandbox_creating",
+            "message": "Creating sandbox..."
+        }
+        
+        # Ensure sandbox is ready
+        sandbox_result = await self.ensure_sandbox()
+        if not sandbox_result.get("success"):
+            yield {
+                "type": "sandbox_error",
+                "error": sandbox_result.get("error", "Failed to create sandbox")
+            }
+            self.is_running = False
+            return
+        
+        yield {
+            "type": "sandbox_ready",
+            "message": "Sandbox ready"
+        }
         
         self.context.add_user_message(user_message)
         
@@ -407,7 +557,7 @@ class ReActAgent:
                                     "iteration": self.current_iteration
                                 }
                             
-                            result = self.tool_executors[tool_name](arguments)
+                            result = await self.tool_executors[tool_name](arguments)
                             result_str = json.dumps(result)
                             
                             self.context.add_tool_result(tool_id, tool_name, result_str)
@@ -493,11 +643,17 @@ class ReActAgent:
         """Stop the agent execution."""
         self.is_running = False
     
-    def reset(self):
-        """Reset the agent state."""
+    async def reset(self):
+        """Reset the agent state and kill sandbox."""
         self.context.clear()
         self.current_iteration = 0
         self.is_running = False
+        self.sandbox_ready = False
+        
+        # Kill the sandbox
+        await sandbox_manager.kill_sandbox(self.session_id)
+        
+        # Generate new session ID
         self.session_id = str(uuid.uuid4())
     
     def get_memory(self) -> dict:

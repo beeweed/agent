@@ -9,8 +9,40 @@ import {
   Send,
   Settings,
   RotateCcw,
-  Lightbulb
+  Lightbulb,
+  Box
 } from "lucide-react";
+
+function SandboxIndicator({ status }: { status: "creating" | "ready" | "error" }) {
+  if (status === "creating") {
+    return (
+      <div data-design-id="sandbox-indicator" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 animate-pulse">
+        <div className="relative">
+          <Box className="w-5 h-5 text-orange-500" />
+          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-orange-500">Creating sandbox...</span>
+          <span className="text-xs text-orange-500/70">Setting up secure environment</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (status === "ready") {
+    return (
+      <div data-design-id="sandbox-ready-indicator" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
+        <Box className="w-5 h-5 text-green-500" />
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-green-500">Sandbox ready</span>
+          <span className="text-xs text-green-500/70">Secure environment active</span>
+        </div>
+      </div>
+    );
+  }
+  
+  return null;
+}
 
 export function ChatPanel() {
   const [input, setInput] = useState("");
@@ -29,6 +61,9 @@ export function ChatPanel() {
     setIsSettingsOpen,
     setIsMemoryOpen,
     apiKey,
+    e2bApiKey,
+    sandboxStatus,
+    setSandboxStatus,
     setCodeStreaming,
     resetCodeStreaming,
   } = useStore();
@@ -43,12 +78,19 @@ export function ChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatEntries, scrollToBottom]);
+  }, [chatEntries, sandboxStatus, scrollToBottom]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isAgentRunning) return;
     
+    // Check for OpenRouter API key
     if (!apiKey) {
+      setIsSettingsOpen(true);
+      return;
+    }
+    
+    // Check for E2B API key
+    if (!e2bApiKey) {
       setIsSettingsOpen(true);
       return;
     }
@@ -64,6 +106,7 @@ export function ChatPanel() {
     setIsAgentRunning(true);
     setCurrentIteration(0);
     resetCodeStreaming();
+    setSandboxStatus("idle");
 
     let currentFileCardId: string | null = null;
     let currentThoughtId: string | null = null;
@@ -72,6 +115,24 @@ export function ChatPanel() {
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
         switch (event.type) {
+          case "sandbox_creating":
+            setSandboxStatus("creating");
+            break;
+            
+          case "sandbox_ready":
+            setSandboxStatus("ready");
+            break;
+            
+          case "sandbox_error":
+            setSandboxStatus("error");
+            addChatEntry({
+              id: crypto.randomUUID(),
+              type: "assistant",
+              content: `Sandbox Error: ${event.error}. Please check your E2B API key in Settings.`,
+              timestamp: new Date(),
+            });
+            break;
+            
           case "iteration":
             setCurrentIteration(event.iteration || 0);
             break;
@@ -302,6 +363,7 @@ export function ChatPanel() {
     useStore.getState().clearChat();
     setCurrentIteration(0);
     resetCodeStreaming();
+    setSandboxStatus("idle");
   };
 
   const handleStop = async () => {
@@ -309,6 +371,8 @@ export function ChatPanel() {
     setIsAgentRunning(false);
     setCodeStreaming({ isStreaming: false });
   };
+
+  const canChat = apiKey && e2bApiKey;
 
   return (
     <div 
@@ -351,7 +415,11 @@ export function ChatPanel() {
           <button 
             data-design-id="settings-btn"
             onClick={() => setIsSettingsOpen(true)}
-            className="w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors"
+            className={`w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg transition-colors ${
+              !canChat 
+                ? "text-orange-500 hover:text-orange-600 hover:bg-orange-500/10 animate-pulse" 
+                : "text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent"
+            }`}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -365,10 +433,15 @@ export function ChatPanel() {
         ref={scrollRef}
       >
         <div className="space-y-4 xs:space-y-5 sm:space-y-6 max-w-[768px] mx-auto">
+          {/* Show sandbox status indicator when creating */}
+          {(sandboxStatus === "creating" || sandboxStatus === "ready") && chatEntries.length > 0 && (
+            <SandboxIndicator status={sandboxStatus} />
+          )}
+          
           {chatEntries.map((entry) => (
             <ChatMessage key={entry.id} entry={entry} />
           ))}
-          {isAgentRunning && (
+          {isAgentRunning && sandboxStatus !== "creating" && (
             <ThinkingIndicator iteration={currentIteration} maxIterations={maxIterations} />
           )}
         </div>
@@ -392,6 +465,25 @@ export function ChatPanel() {
           </div>
         )}
         
+        {/* Warning banner if API keys are missing */}
+        {!canChat && (
+          <div 
+            data-design-id="api-key-warning"
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-2 mb-2 xs:mb-3 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20 cursor-pointer hover:bg-orange-500/15 transition-colors"
+          >
+            <Settings className="w-4 h-4 text-orange-500" />
+            <span className="text-xs text-orange-500">
+              {!apiKey && !e2bApiKey 
+                ? "Configure API keys in Settings to start chatting"
+                : !apiKey 
+                  ? "OpenRouter API key required"
+                  : "E2B API key required for sandbox"
+              }
+            </span>
+          </div>
+        )}
+        
         <div data-design-id="input-wrapper" className="w-full">
           <div 
             data-design-id="input-area"
@@ -401,12 +493,12 @@ export function ChatPanel() {
               <textarea
                 ref={textareaRef}
                 data-design-id="chat-textarea"
-                placeholder="Ask Anygent to help you..."
+                placeholder={canChat ? "Ask Anygent to help you..." : "Configure API keys in Settings to start..."}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="w-full min-h-[32px] xs:min-h-[40px] sm:min-h-[60px] bg-transparent border-none outline-none resize-none font-sans text-xs xs:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground"
-                disabled={isAgentRunning}
+                disabled={isAgentRunning || !canChat}
                 rows={2}
               />
               
@@ -418,7 +510,7 @@ export function ChatPanel() {
                 <button
                   data-design-id="send-btn"
                   onClick={handleSubmit}
-                  disabled={isAgentRunning || !input.trim()}
+                  disabled={isAgentRunning || !input.trim() || !canChat}
                   className="w-9 h-9 xs:w-10 xs:h-10 sm:w-8 sm:h-8 rounded-lg bg-primary flex items-center justify-center hover:brightness-105 active:scale-95 transition-all disabled:bg-accent disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4 text-primary-foreground" />

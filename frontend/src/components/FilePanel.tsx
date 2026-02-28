@@ -1,14 +1,15 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileTree } from "./FileTree";
 import { CodeEditor } from "./CodeEditor";
-import { FolderOpen, RefreshCw, X, ChevronRight } from "lucide-react";
+import { FolderOpen, RefreshCw, X, ChevronRight, Box } from "lucide-react";
 
 export function FilePanel() {
-  const { fileTree, selectedFile, fileContent, setFileContent, openTabs, setSelectedFile, removeTab } = useStore();
-  const { fetchFileTree, readFile } = useApi();
+  const { fileTree, selectedFile, fileContent, setFileContent, openTabs, setSelectedFile, removeTab, sandboxStatus } = useStore();
+  const { fetchFileTree, refreshFileTree, readFile } = useApi();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchFileTree();
@@ -24,6 +25,15 @@ export function FilePanel() {
   useEffect(() => {
     loadFileContent();
   }, [loadFileContent]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshFileTree();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split(".").pop()?.toLowerCase();
@@ -55,6 +65,8 @@ export function FilePanel() {
     return parts;
   };
 
+  const hasFiles = fileTree && fileTree.children && fileTree.children.length > 0;
+
   return (
     <div data-design-id="file-panel" className="flex flex-col sm:flex-row h-full">
       <div data-design-id="file-explorer" className="w-full sm:w-40 md:w-48 lg:w-56 h-[30%] xs:h-[35%] sm:h-full bg-secondary/50 border-b sm:border-b-0 sm:border-r border-border flex flex-col flex-shrink-0">
@@ -62,10 +74,19 @@ export function FilePanel() {
           <div className="flex items-center gap-1.5 xs:gap-2">
             <FolderOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground" />
             <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Explorer</span>
+            {sandboxStatus === "ready" && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20">
+                <Box className="w-2.5 h-2.5 text-green-500" />
+                <span className="text-[8px] text-green-500 font-medium">E2B</span>
+              </div>
+            )}
           </div>
           <button
-            onClick={() => fetchFileTree()}
-            className="p-1 xs:p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors"
+            data-design-id="refresh-files-btn"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`p-1 xs:p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+            title="Refresh files from E2B sandbox"
           >
             <RefreshCw className="w-3 h-3 xs:w-3.5 xs:h-3.5" />
           </button>
@@ -73,11 +94,19 @@ export function FilePanel() {
         
         <ScrollArea className="flex-1">
           <div className="py-1 xs:py-2">
-            {fileTree ? (
+            {hasFiles ? (
               <FileTree node={fileTree} level={0} />
             ) : (
-              <div className="px-3 xs:px-4 py-6 xs:py-8 text-center text-[11px] xs:text-sm text-muted-foreground">
-                No files yet. Start building!
+              <div className="px-3 xs:px-4 py-6 xs:py-8 text-center">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-muted flex items-center justify-center">
+                  <Box className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-[11px] xs:text-xs text-muted-foreground mb-1">No files yet</p>
+                <p className="text-[10px] xs:text-[11px] text-muted-foreground/70">
+                  {sandboxStatus === "ready" 
+                    ? "Files will appear here when created" 
+                    : "Start a chat to create files in E2B sandbox"}
+                </p>
               </div>
             )}
           </div>

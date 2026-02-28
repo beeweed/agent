@@ -16,7 +16,7 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export function useApi() {
-  const { apiKey, selectedModel, setModels, setModelsLoading, setFileTree, setMemory } = useStore();
+  const { apiKey, e2bApiKey, selectedModel, setModels, setModelsLoading, setFileTree, setMemory } = useStore();
 
   const fetchModels = useCallback(async () => {
     if (!apiKey) return;
@@ -49,6 +49,7 @@ export function useApi() {
           message,
           api_key: apiKey,
           model: selectedModel,
+          e2b_api_key: e2bApiKey,
         }),
       });
 
@@ -82,7 +83,7 @@ export function useApi() {
         }
       }
     },
-    [apiKey, selectedModel]
+    [apiKey, e2bApiKey, selectedModel]
   );
 
   const fetchFileTree = useCallback(async () => {
@@ -97,12 +98,32 @@ export function useApi() {
     }
   }, [setFileTree]);
 
+  const refreshFileTree = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/files/refresh`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as FileNode;
+      setFileTree(data);
+      return data;
+    } catch (error) {
+      console.error("Failed to refresh file tree:", error);
+      return null;
+    }
+  }, [setFileTree]);
+
   const readFile = useCallback(async (filePath: string): Promise<string> => {
     try {
+      // Ensure path starts with /home/user/ for E2B sandbox
+      let adjustedPath = filePath;
+      if (!filePath.startsWith("/home/user/")) {
+        adjustedPath = `/home/user${filePath}`;
+      }
+      
       const response = await fetch(`${API_BASE}/api/files/read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_path: filePath }),
+        body: JSON.stringify({ file_path: adjustedPath }),
       });
       const data = await response.json();
       return data.content || "";
@@ -142,13 +163,25 @@ export function useApi() {
     }
   }, []);
 
+  const getSandboxStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/sandbox/status`);
+      return await response.json();
+    } catch (error) {
+      console.error("Failed to get sandbox status:", error);
+      return null;
+    }
+  }, []);
+
   return {
     fetchModels,
     sendMessage,
     fetchFileTree,
+    refreshFileTree,
     readFile,
     fetchMemory,
     resetChat,
     stopAgent,
+    getSandboxStatus,
   };
 }

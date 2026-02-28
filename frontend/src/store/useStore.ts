@@ -10,9 +10,17 @@ export interface CodeStreamingState {
   action: string;
 }
 
+export type SandboxStatus = "idle" | "creating" | "ready" | "error";
+
 interface AppState {
   apiKey: string;
   setApiKey: (key: string) => void;
+  
+  e2bApiKey: string;
+  setE2bApiKey: (key: string) => void;
+  
+  sandboxStatus: SandboxStatus;
+  setSandboxStatus: (status: SandboxStatus) => void;
   
   selectedModel: string;
   setSelectedModel: (model: string) => void;
@@ -83,6 +91,12 @@ export const useStore = create<AppState>()(
       apiKey: "",
       setApiKey: (key) => set({ apiKey: key }),
       
+      e2bApiKey: "",
+      setE2bApiKey: (key) => set({ e2bApiKey: key }),
+      
+      sandboxStatus: "idle",
+      setSandboxStatus: (status) => set({ sandboxStatus: status }),
+      
       selectedModel: "anthropic/claude-3.5-sonnet",
       setSelectedModel: (model) => set({ selectedModel: model }),
       
@@ -100,7 +114,7 @@ export const useStore = create<AppState>()(
             entry.id === id ? { ...entry, ...updates } : entry
           ),
         })),
-      clearChat: () => set({ chatEntries: [] }),
+      clearChat: () => set({ chatEntries: [], sandboxStatus: "idle" }),
       
       fileTree: null,
       setFileTree: (tree) => set({ fileTree: tree }),
@@ -166,6 +180,7 @@ export const useStore = create<AppState>()(
       name: "anygent-storage",
       partialize: (state) => ({
         apiKey: state.apiKey,
+        e2bApiKey: state.e2bApiKey,
         selectedModel: state.selectedModel,
       }),
     }
