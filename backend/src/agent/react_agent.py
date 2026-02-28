@@ -256,7 +256,8 @@ class ReActAgent:
         api_key: str,
         model: str = "anthropic/claude-3.5-sonnet",
         max_iterations: int = 500,
-        e2b_api_key: str = ""
+        e2b_api_key: str = "",
+        session_id: str = "default"
     ):
         self.api_key = api_key
         self.model = model
@@ -265,7 +266,7 @@ class ReActAgent:
         self.context = ContextWindow()
         self.current_iteration = 0
         self.is_running = False
-        self.session_id = str(uuid.uuid4())
+        self.session_id = session_id  # Use provided session ID for sandbox consistency
         self.sandbox_ready = False
         
         self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION]
@@ -650,11 +651,8 @@ class ReActAgent:
         self.is_running = False
         self.sandbox_ready = False
         
-        # Kill the sandbox
+        # Kill the sandbox (keep same session_id for consistency)
         await sandbox_manager.kill_sandbox(self.session_id)
-        
-        # Generate new session ID
-        self.session_id = str(uuid.uuid4())
     
     def get_memory(self) -> dict:
         """Get the agent's memory/context."""

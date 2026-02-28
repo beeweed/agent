@@ -87,12 +87,14 @@ async def chat(request: ChatRequest):
             api_key=request.api_key,
             model=request.model,
             max_iterations=500,
-            e2b_api_key=request.e2b_api_key
+            e2b_api_key=request.e2b_api_key,
+            session_id=session_id  # Pass session_id for sandbox consistency
         )
     else:
         agents[session_id].api_key = request.api_key
         agents[session_id].model = request.model
         agents[session_id].e2b_api_key = request.e2b_api_key
+        agents[session_id].session_id = session_id
     
     agent = agents[session_id]
     

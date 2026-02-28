@@ -309,6 +309,7 @@ export function ChatPanel() {
             
           case "complete":
             fetchMemory();
+            fetchFileTree();  // Refresh file tree after completion
             setCodeStreaming({ isStreaming: false });
             break;
             
