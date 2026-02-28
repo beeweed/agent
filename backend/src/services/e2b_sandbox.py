@@ -11,42 +11,62 @@ from e2b import AsyncSandbox
 from e2b.sandbox.filesystem.filesystem import FileType
 
 
+# Maximum timeout: 24 hours for Pro users, 1 hour for Hobby users
+MAX_TIMEOUT_SECONDS = 86400  # 24 hours
+DEFAULT_TIMEOUT_SECONDS = 3600  # 1 hour (hobby plan safe default)
+
+
 class E2BSandboxManager:
     """
     Manages E2B sandbox lifecycle and operations.
     
     Each session gets its own sandbox instance that persists
     until the session is reset or times out.
+    
+    Features:
+    - Reconnects to existing sandboxes when possible
+    - Stores sandbox IDs for reconnection after server restart
+    - Extends sandbox timeout on activity
     """
     
     def __init__(self):
         self.sandboxes: Dict[str, AsyncSandbox] = {}
         self.sandbox_info: Dict[str, dict] = {}
+        self._api_keys: Dict[str, str] = {}  # Store API keys for reconnection
     
     async def create_sandbox(
         self,
         session_id: str,
         api_key: str,
-        timeout: int = 300
+        timeout: int = None
     ) -> dict:
         """
-        Create a new E2B sandbox for a session.
+        Create a new E2B sandbox for a session or reconnect to existing one.
         
         Args:
             session_id: Unique session identifier
             api_key: E2B API key
-            timeout: Sandbox timeout in seconds (default 5 minutes)
+            timeout: Sandbox timeout in seconds (default: 1 hour, max: 24 hours)
             
         Returns:
             Dictionary with sandbox creation result
         """
+        # Use default timeout if not specified
+        if timeout is None:
+            timeout = DEFAULT_TIMEOUT_SECONDS
+        
+        # Store API key for reconnection
+        self._api_keys[session_id] = api_key
+        
         try:
-            # Reuse existing sandbox if present
+            # Try to reuse existing sandbox object if present
             if session_id in self.sandboxes:
                 existing_sandbox = self.sandboxes[session_id]
                 try:
                     is_running = await existing_sandbox.is_running()
                     if is_running:
+                        # Extend timeout to keep sandbox alive
+                        await self._extend_timeout(session_id)
                         return {
                             "success": True,
                             "message": "Existing sandbox reused",
@@ -54,12 +74,22 @@ class E2BSandboxManager:
                             "session_id": session_id
                         }
                 except Exception:
-                    # Sandbox may have expired, remove reference and create new one
-                    del self.sandboxes[session_id]
-                    if session_id in self.sandbox_info:
-                        del self.sandbox_info[session_id]
+                    # Sandbox object invalid, try to reconnect by ID
+                    pass
             
-            # Create new sandbox using base template
+            # Try to reconnect to existing sandbox by ID if we have it stored
+            sandbox_id = self.sandbox_info.get(session_id, {}).get("sandbox_id")
+            if sandbox_id:
+                reconnected = await self._try_reconnect(session_id, sandbox_id, api_key)
+                if reconnected:
+                    return {
+                        "success": True,
+                        "message": "Reconnected to existing sandbox",
+                        "sandbox_id": sandbox_id,
+                        "session_id": session_id
+                    }
+            
+            # Create new sandbox using base template with extended timeout
             sandbox = await AsyncSandbox.create(
                 api_key=api_key,
                 timeout=timeout
@@ -69,8 +99,9 @@ class E2BSandboxManager:
             
             # Get sandbox info
             info = await sandbox.get_info()
+            sandbox_id = info.sandbox_id if hasattr(info, 'sandbox_id') else str(sandbox)
             self.sandbox_info[session_id] = {
-                "sandbox_id": info.sandbox_id if hasattr(info, 'sandbox_id') else str(sandbox),
+                "sandbox_id": sandbox_id,
                 "template": "base",
                 "timeout": timeout,
                 "status": "running"
@@ -82,7 +113,7 @@ class E2BSandboxManager:
             return {
                 "success": True,
                 "message": "Sandbox created successfully",
-                "sandbox_id": self.sandbox_info[session_id]["sandbox_id"],
+                "sandbox_id": sandbox_id,
                 "session_id": session_id
             }
             
@@ -93,9 +124,144 @@ class E2BSandboxManager:
                 "session_id": session_id
             }
     
+    async def _try_reconnect(
+        self,
+        session_id: str,
+        sandbox_id: str,
+        api_key: str
+    ) -> bool:
+        """
+        Try to reconnect to an existing sandbox by ID.
+        
+        Returns:
+            True if reconnection successful, False otherwise
+        """
+        try:
+            sandbox = await AsyncSandbox.connect(
+                sandbox_id=sandbox_id,
+                api_key=api_key
+            )
+            
+            # Verify sandbox is actually running
+            is_running = await sandbox.is_running()
+            if is_running:
+                self.sandboxes[session_id] = sandbox
+                # Extend timeout after reconnection
+                await self._extend_timeout(session_id)
+                return True
+            
+            return False
+        except Exception:
+            # Reconnection failed, sandbox may have been terminated
+            return False
+    
+    async def _extend_timeout(self, session_id: str) -> bool:
+        """
+        Extend sandbox timeout to keep it alive longer.
+        
+        Returns:
+            True if timeout was extended, False otherwise
+        """
+        try:
+            sandbox = self.sandboxes.get(session_id)
+            if sandbox:
+                # Extend timeout to maximum allowed
+                await sandbox.set_timeout(DEFAULT_TIMEOUT_SECONDS)
+                return True
+            return False
+        except Exception:
+            return False
+    
     async def get_sandbox(self, session_id: str) -> Optional[AsyncSandbox]:
-        """Get sandbox instance for a session."""
-        return self.sandboxes.get(session_id)
+        """
+        Get sandbox instance for a session.
+        
+        Automatically tries to reconnect if the sandbox object is invalid
+        but we have a stored sandbox_id.
+        """
+        sandbox = self.sandboxes.get(session_id)
+        
+        if sandbox:
+            try:
+                is_running = await sandbox.is_running()
+                if is_running:
+                    return sandbox
+            except Exception:
+                pass
+        
+        # Try to reconnect using stored sandbox_id and api_key
+        sandbox_id = self.sandbox_info.get(session_id, {}).get("sandbox_id")
+        api_key = self._api_keys.get(session_id)
+        
+        if sandbox_id and api_key:
+            reconnected = await self._try_reconnect(session_id, sandbox_id, api_key)
+            if reconnected:
+                return self.sandboxes.get(session_id)
+        
+        return None
+    
+    async def keepalive(self, session_id: str, api_key: str = None) -> dict:
+        """
+        Keep sandbox alive by extending its timeout.
+        
+        This should be called periodically by the frontend to prevent
+        sandbox from being automatically terminated.
+        
+        Args:
+            session_id: Session identifier
+            api_key: E2B API key (optional, uses stored key if not provided)
+            
+        Returns:
+            Dictionary with keepalive result
+        """
+        try:
+            # Update stored API key if provided
+            if api_key:
+                self._api_keys[session_id] = api_key
+            
+            sandbox = self.sandboxes.get(session_id)
+            sandbox_id = self.sandbox_info.get(session_id, {}).get("sandbox_id")
+            
+            # Try to reconnect if we don't have a valid sandbox object
+            if not sandbox and sandbox_id:
+                stored_api_key = self._api_keys.get(session_id) or api_key
+                if stored_api_key:
+                    reconnected = await self._try_reconnect(session_id, sandbox_id, stored_api_key)
+                    if reconnected:
+                        sandbox = self.sandboxes.get(session_id)
+            
+            if not sandbox:
+                return {
+                    "success": False,
+                    "error": "No sandbox found for session",
+                    "session_id": session_id
+                }
+            
+            # Check if sandbox is running
+            is_running = await sandbox.is_running()
+            if not is_running:
+                return {
+                    "success": False,
+                    "error": "Sandbox is not running",
+                    "session_id": session_id
+                }
+            
+            # Extend timeout
+            await sandbox.set_timeout(DEFAULT_TIMEOUT_SECONDS)
+            
+            return {
+                "success": True,
+                "message": f"Sandbox keepalive successful, timeout extended to {DEFAULT_TIMEOUT_SECONDS} seconds",
+                "session_id": session_id,
+                "sandbox_id": sandbox_id
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "session_id": session_id
+            }
     
     async def is_sandbox_running(self, session_id: str) -> bool:
         """Check if sandbox is running for a session."""

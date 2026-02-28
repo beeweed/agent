@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
+import { useApi } from "@/hooks/useApi";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FilePanel } from "@/components/FilePanel";
 import { ComputerPanel } from "@/components/ComputerPanel";
@@ -7,8 +9,38 @@ import { MemorySidebar } from "@/components/MemorySidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { Monitor, FolderOpen, MessageSquare } from "lucide-react";
 
+// Keepalive interval: 5 minutes (in milliseconds)
+const KEEPALIVE_INTERVAL = 5 * 60 * 1000;
+
 function App() {
-  const { mobileTab, setMobileTab, rightPanel, setRightPanel } = useStore();
+  const { mobileTab, setMobileTab, rightPanel, setRightPanel, e2bApiKey } = useStore();
+  const { sandboxKeepalive } = useApi();
+  const keepaliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sandbox keepalive - prevents sandbox from being automatically deleted
+  useEffect(() => {
+    // Clear any existing interval
+    if (keepaliveIntervalRef.current) {
+      clearInterval(keepaliveIntervalRef.current);
+    }
+
+    // Only start keepalive if E2B API key is configured
+    if (e2bApiKey) {
+      // Immediate keepalive call
+      sandboxKeepalive();
+
+      // Set up periodic keepalive
+      keepaliveIntervalRef.current = setInterval(() => {
+        sandboxKeepalive();
+      }, KEEPALIVE_INTERVAL);
+    }
+
+    return () => {
+      if (keepaliveIntervalRef.current) {
+        clearInterval(keepaliveIntervalRef.current);
+      }
+    };
+  }, [e2bApiKey, sandboxKeepalive]);
 
   return (
     <div data-design-id="app-container" className="h-dvh w-screen overflow-hidden bg-background flex flex-col">

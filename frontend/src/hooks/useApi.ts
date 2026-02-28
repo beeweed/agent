@@ -173,6 +173,25 @@ export function useApi() {
     }
   }, []);
 
+  const sandboxKeepalive = useCallback(async () => {
+    if (!e2bApiKey) return null;
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/sandbox/keepalive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          e2b_api_key: e2bApiKey,
+          session_id: "default",
+        }),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error("Failed to keepalive sandbox:", error);
+      return null;
+    }
+  }, [e2bApiKey]);
+
   return {
     fetchModels,
     sendMessage,
@@ -183,5 +202,6 @@ export function useApi() {
     resetChat,
     stopAgent,
     getSandboxStatus,
+    sandboxKeepalive,
   };
 }

@@ -207,6 +207,21 @@ async def kill_sandbox(session_id: str = "default"):
     return {"success": False, "error": "Sandbox deletion is not allowed"}
 
 
+@app.post("/api/sandbox/keepalive")
+async def sandbox_keepalive(request: SandboxRequest):
+    """
+    Keep sandbox alive by extending its timeout.
+    
+    This should be called periodically by the frontend (e.g., every 5 minutes)
+    to prevent the sandbox from being automatically terminated by E2B.
+    """
+    result = await sandbox_manager.keepalive(
+        request.session_id or "default",
+        request.e2b_api_key
+    )
+    return result
+
+
 @app.get("/api/status")
 async def get_status(session_id: str = "default"):
     """Get the current agent status."""
