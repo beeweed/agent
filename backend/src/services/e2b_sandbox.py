@@ -8,6 +8,7 @@ Uses the base template for maximum flexibility.
 import asyncio
 from typing import Optional, Dict, List, Any
 from e2b import AsyncSandbox
+from e2b.sandbox.filesystem.filesystem import FileType
 
 
 class E2BSandboxManager:
@@ -252,7 +253,7 @@ class E2BSandboxManager:
                         if entry.name.startswith('.'):
                             continue
                         
-                        if entry.type == "dir":
+                        if entry.type == FileType.DIR:
                             children = await build_tree(entry_path, depth + 1)
                             items.append({
                                 "name": entry.name,
