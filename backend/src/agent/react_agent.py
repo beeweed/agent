@@ -645,14 +645,11 @@ class ReActAgent:
         self.is_running = False
     
     async def reset(self):
-        """Reset the agent state and kill sandbox."""
+        """Reset the agent state (sandbox is preserved)."""
         self.context.clear()
         self.current_iteration = 0
         self.is_running = False
-        self.sandbox_ready = False
-        
-        # Kill the sandbox (keep same session_id for consistency)
-        await sandbox_manager.kill_sandbox(self.session_id)
+        # Note: sandbox_ready remains True if sandbox exists, sandbox is not deleted
     
     def get_memory(self) -> dict:
         """Get the agent's memory/context."""

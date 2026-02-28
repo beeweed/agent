@@ -203,8 +203,8 @@ async def sandbox_status(session_id: str = "default"):
 
 @app.post("/api/sandbox/kill")
 async def kill_sandbox(session_id: str = "default"):
-    """Kill E2B sandbox for a session."""
-    return await sandbox_manager.kill_sandbox(session_id)
+    """Kill E2B sandbox for a session - DISABLED."""
+    return {"success": False, "error": "Sandbox deletion is not allowed"}
 
 
 @app.get("/api/status")

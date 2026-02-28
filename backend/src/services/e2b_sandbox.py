@@ -41,9 +41,23 @@ class E2BSandboxManager:
             Dictionary with sandbox creation result
         """
         try:
-            # Kill existing sandbox if present
+            # Reuse existing sandbox if present
             if session_id in self.sandboxes:
-                await self.kill_sandbox(session_id)
+                existing_sandbox = self.sandboxes[session_id]
+                try:
+                    is_running = await existing_sandbox.is_running()
+                    if is_running:
+                        return {
+                            "success": True,
+                            "message": "Existing sandbox reused",
+                            "sandbox_id": self.sandbox_info.get(session_id, {}).get("sandbox_id", "existing"),
+                            "session_id": session_id
+                        }
+                except Exception:
+                    # Sandbox may have expired, remove reference and create new one
+                    del self.sandboxes[session_id]
+                    if session_id in self.sandbox_info:
+                        del self.sandbox_info[session_id]
             
             # Create new sandbox using base template
             sandbox = await AsyncSandbox.create(
@@ -94,18 +108,9 @@ class E2BSandboxManager:
         return False
     
     async def kill_sandbox(self, session_id: str) -> dict:
-        """Kill sandbox for a session."""
-        try:
-            sandbox = self.sandboxes.get(session_id)
-            if sandbox:
-                await sandbox.kill()
-                del self.sandboxes[session_id]
-                if session_id in self.sandbox_info:
-                    del self.sandbox_info[session_id]
-                return {"success": True, "message": "Sandbox killed"}
-            return {"success": False, "error": "No sandbox found for session"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        """Kill sandbox for a session - DISABLED."""
+        # Sandbox deletion is disabled
+        return {"success": False, "error": "Sandbox deletion is not allowed"}
     
     async def write_file(
         self,
