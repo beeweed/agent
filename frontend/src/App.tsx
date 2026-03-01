@@ -4,10 +4,11 @@ import { useApi } from "@/hooks/useApi";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FilePanel } from "@/components/FilePanel";
 import { ComputerPanel } from "@/components/ComputerPanel";
+import { TerminalPanel } from "@/components/TerminalPanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { MemorySidebar } from "@/components/MemorySidebar";
 import { Toaster } from "@/components/ui/sonner";
-import { Monitor, FolderOpen, MessageSquare } from "lucide-react";
+import { Monitor, FolderOpen, MessageSquare, TerminalSquare } from "lucide-react";
 
 // Keepalive interval: 5 minutes (in milliseconds)
 const KEEPALIVE_INTERVAL = 5 * 60 * 1000;
@@ -108,12 +109,26 @@ function App() {
                   <FolderOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   <span className="hidden sm:inline">Files</span>
                 </button>
+                <button
+                  data-design-id="terminal-tab-btn"
+                  onClick={() => setRightPanel("terminal")}
+                  className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-md md:rounded-lg text-xs md:text-sm font-medium transition-all ${
+                    rightPanel === "terminal"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <TerminalSquare className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">Terminal</span>
+                </button>
               </div>
             </div>
             
             <div className="flex-1 overflow-hidden">
               {rightPanel === "computer" ? (
                 <ComputerPanel />
+              ) : rightPanel === "terminal" ? (
+                <TerminalPanel />
               ) : (
                 <FilePanel />
               )}
@@ -131,6 +146,10 @@ function App() {
           ) : mobileTab === "computer" ? (
             <div className="h-full overflow-hidden">
               <ComputerPanel />
+            </div>
+          ) : mobileTab === "terminal" ? (
+            <div className="h-full overflow-hidden">
+              <TerminalPanel />
             </div>
           ) : (
             <div className="h-full overflow-hidden">
@@ -175,6 +194,18 @@ function App() {
           >
             <FolderOpen className="w-5 h-5 xs:w-6 xs:h-6" />
             <span className="text-[10px] xs:text-xs sm:text-sm font-medium">Files</span>
+          </button>
+          <button
+            data-design-id="mobile-terminal-tab"
+            onClick={() => setMobileTab("terminal")}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 xs:gap-1 transition-all active:scale-95 ${
+              mobileTab === "terminal"
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground active:text-foreground"
+            }`}
+          >
+            <TerminalSquare className="w-5 h-5 xs:w-6 xs:h-6" />
+            <span className="text-[10px] xs:text-xs sm:text-sm font-medium">Terminal</span>
           </button>
         </div>
       </div>

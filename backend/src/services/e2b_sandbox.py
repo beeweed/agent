@@ -27,12 +27,14 @@ class E2BSandboxManager:
     - Reconnects to existing sandboxes when possible
     - Stores sandbox IDs for reconnection after server restart
     - Extends sandbox timeout on activity
+    - PTY terminal support for interactive shell access
     """
     
     def __init__(self):
         self.sandboxes: Dict[str, AsyncSandbox] = {}
         self.sandbox_info: Dict[str, dict] = {}
         self._api_keys: Dict[str, str] = {}  # Store API keys for reconnection
+        self._terminals: Dict[str, Dict[str, Any]] = {}  # session_id -> {terminal_id -> terminal_info}
     
     async def create_sandbox(
         self,
@@ -527,6 +529,201 @@ class E2BSandboxManager:
         """Cleanup all sandboxes."""
         for session_id in list(self.sandboxes.keys()):
             await self.kill_sandbox(session_id)
+    
+    # ============================================================================
+    # TERMINAL OPERATIONS
+    # ============================================================================
+    
+    async def create_terminal(
+        self,
+        session_id: str,
+        terminal_id: str,
+        cols: int = 80,
+        rows: int = 24
+    ) -> dict:
+        """
+        Create a new PTY terminal in the sandbox.
+        
+        Args:
+            session_id: Session identifier
+            terminal_id: Unique terminal identifier
+            cols: Terminal columns
+            rows: Terminal rows
+            
+        Returns:
+            Dictionary with terminal creation result including PID
+        """
+        try:
+            sandbox = await self.get_sandbox(session_id)
+            if not sandbox:
+                return {
+                    "success": False,
+                    "error": "No sandbox found for session. Please ensure sandbox is created first."
+                }
+            
+            # Initialize terminal storage for session if needed
+            if session_id not in self._terminals:
+                self._terminals[session_id] = {}
+            
+            # Create PTY terminal
+            pty = await sandbox.pty.create(
+                cols=cols,
+                rows=rows,
+                timeout=0  # No timeout - keep terminal alive
+            )
+            
+            # Store terminal info
+            self._terminals[session_id][terminal_id] = {
+                "pid": pty.pid,
+                "cols": cols,
+                "rows": rows,
+                "pty": pty
+            }
+            
+            return {
+                "success": True,
+                "terminal_id": terminal_id,
+                "pid": pty.pid,
+                "cols": cols,
+                "rows": rows
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def send_terminal_input(
+        self,
+        session_id: str,
+        terminal_id: str,
+        data: str
+    ) -> dict:
+        """
+        Send input to a terminal.
+        
+        Args:
+            session_id: Session identifier
+            terminal_id: Terminal identifier
+            data: Input data to send
+            
+        Returns:
+            Dictionary with operation result
+        """
+        try:
+            sandbox = await self.get_sandbox(session_id)
+            if not sandbox:
+                return {"success": False, "error": "No sandbox found"}
+            
+            terminal_info = self._terminals.get(session_id, {}).get(terminal_id)
+            if not terminal_info:
+                return {"success": False, "error": "Terminal not found"}
+            
+            # Send input to PTY
+            await sandbox.pty.send_input(
+                terminal_info["pid"],
+                data.encode('utf-8')
+            )
+            
+            return {"success": True}
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    async def resize_terminal(
+        self,
+        session_id: str,
+        terminal_id: str,
+        cols: int,
+        rows: int
+    ) -> dict:
+        """
+        Resize a terminal.
+        
+        Args:
+            session_id: Session identifier
+            terminal_id: Terminal identifier
+            cols: New column count
+            rows: New row count
+            
+        Returns:
+            Dictionary with operation result
+        """
+        try:
+            sandbox = await self.get_sandbox(session_id)
+            if not sandbox:
+                return {"success": False, "error": "No sandbox found"}
+            
+            terminal_info = self._terminals.get(session_id, {}).get(terminal_id)
+            if not terminal_info:
+                return {"success": False, "error": "Terminal not found"}
+            
+            # Resize PTY
+            await sandbox.pty.resize(
+                terminal_info["pid"],
+                cols=cols,
+                rows=rows
+            )
+            
+            # Update stored info
+            terminal_info["cols"] = cols
+            terminal_info["rows"] = rows
+            
+            return {"success": True, "cols": cols, "rows": rows}
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    async def close_terminal(
+        self,
+        session_id: str,
+        terminal_id: str
+    ) -> dict:
+        """
+        Close a terminal.
+        
+        Args:
+            session_id: Session identifier
+            terminal_id: Terminal identifier
+            
+        Returns:
+            Dictionary with operation result
+        """
+        try:
+            sandbox = await self.get_sandbox(session_id)
+            if not sandbox:
+                return {"success": False, "error": "No sandbox found"}
+            
+            terminal_info = self._terminals.get(session_id, {}).get(terminal_id)
+            if not terminal_info:
+                return {"success": False, "error": "Terminal not found"}
+            
+            # Kill PTY process
+            try:
+                await sandbox.pty.kill(terminal_info["pid"])
+            except Exception:
+                pass  # Terminal may already be closed
+            
+            # Remove from storage
+            del self._terminals[session_id][terminal_id]
+            
+            return {"success": True}
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def get_terminal_info(
+        self,
+        session_id: str,
+        terminal_id: str
+    ) -> Optional[dict]:
+        """Get terminal info."""
+        return self._terminals.get(session_id, {}).get(terminal_id)
+    
+    def get_all_terminals(self, session_id: str) -> Dict[str, dict]:
+        """Get all terminals for a session."""
+        return self._terminals.get(session_id, {})
 
 
 # Global sandbox manager instance

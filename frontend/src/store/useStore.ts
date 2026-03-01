@@ -65,11 +65,11 @@ interface AppState {
   isMemoryOpen: boolean;
   setIsMemoryOpen: (open: boolean) => void;
   
-  mobileTab: "chat" | "computer" | "files";
-  setMobileTab: (tab: "chat" | "computer" | "files") => void;
+  mobileTab: "chat" | "computer" | "files" | "terminal";
+  setMobileTab: (tab: "chat" | "computer" | "files" | "terminal") => void;
   
-  rightPanel: "computer" | "files";
-  setRightPanel: (panel: "computer" | "files") => void;
+  rightPanel: "computer" | "files" | "terminal";
+  setRightPanel: (panel: "computer" | "files" | "terminal") => void;
   
   codeStreaming: CodeStreamingState;
   setCodeStreaming: (state: Partial<CodeStreamingState>) => void;
