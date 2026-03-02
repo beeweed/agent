@@ -7,6 +7,7 @@ from .models import ContextWindow, AgentState
 from .system_prompt import get_system_prompt
 from ..services.openrouter import chat_completion, chat_completion_non_streaming
 from ..services.e2b_sandbox import sandbox_manager
+from ..tools.shell import SHELL_TOOL_DEFINITION
 
 
 # Tool definitions for E2B sandbox operations
@@ -269,12 +270,16 @@ class ReActAgent:
         self.session_id = session_id  # Use provided session ID for sandbox consistency
         self.sandbox_ready = False
         
-        self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION]
+        self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION, SHELL_TOOL_DEFINITION]
         
         self.tool_executors = {
             "file_write": self._execute_file_write,
-            "Read": self._execute_file_read
+            "Read": self._execute_file_read,
+            "shell": self._execute_shell
         }
+        
+        # Shell execution state for streaming output
+        self._pending_shell_result = None
     
     async def _execute_file_write(self, arguments: dict) -> dict:
         """Execute the file_write tool using E2B sandbox."""
@@ -319,6 +324,66 @@ class ReActAgent:
         )
         
         return result
+    
+    async def _execute_shell(self, arguments: dict) -> dict:
+        """
+        Execute the shell tool - runs a command in the E2B sandbox.
+        
+        This method runs commands in the sandbox and returns the output.
+        The frontend terminal will show the command execution in real-time.
+        """
+        session_name = arguments.get("session_name", "main")
+        command = arguments.get("command", "")
+        
+        if not command:
+            return {
+                "success": False,
+                "error": "No command provided",
+                "session_name": session_name
+            }
+        
+        try:
+            # Get the sandbox
+            sandbox = await sandbox_manager.get_sandbox(self.session_id)
+            if not sandbox:
+                return {
+                    "success": False,
+                    "error": "No sandbox found. Please ensure the sandbox is created first.",
+                    "session_name": session_name
+                }
+            
+            # Run the command using sandbox.commands.run for simple execution
+            # This captures output properly
+            result = await sandbox.commands.run(
+                command,
+                cwd="/home/user",
+                timeout=120
+            )
+            
+            # Combine stdout and stderr
+            output = ""
+            if result.stdout:
+                output += result.stdout
+            if result.stderr:
+                if output:
+                    output += "\n"
+                output += result.stderr
+            
+            return {
+                "success": result.exit_code == 0,
+                "output": output.strip() if output else "(no output)",
+                "exit_code": result.exit_code,
+                "session_name": session_name,
+                "command": command
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "session_name": session_name,
+                "command": command
+            }
     
     async def ensure_sandbox(self) -> dict:
         """Ensure sandbox is created and running."""
@@ -558,6 +623,19 @@ class ReActAgent:
                                     "iteration": self.current_iteration
                                 }
                             
+                            # Emit shell_exec_start event before executing shell tool
+                            if tool_name == "shell":
+                                session_name = arguments.get("session_name", "main")
+                                command = arguments.get("command", "")
+                                yield {
+                                    "type": "shell_exec_start",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "session_name": session_name,
+                                    "command": command,
+                                    "iteration": self.current_iteration
+                                }
+                            
                             result = await self.tool_executors[tool_name](arguments)
                             result_str = json.dumps(result)
                             
@@ -570,6 +648,18 @@ class ReActAgent:
                                     "tool_id": tool_id,
                                     "tool_name": tool_name,
                                     "file_path": arguments.get("file_path", ""),
+                                    "result": result,
+                                    "iteration": self.current_iteration
+                                }
+                            
+                            # Emit shell_exec_end event after executing shell tool
+                            if tool_name == "shell":
+                                yield {
+                                    "type": "shell_exec_end",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "session_name": arguments.get("session_name", "main"),
+                                    "command": arguments.get("command", ""),
                                     "result": result,
                                     "iteration": self.current_iteration
                                 }

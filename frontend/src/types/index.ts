@@ -57,6 +57,15 @@ export interface ReadFileResult {
   error?: string;
 }
 
+export interface ShellResult {
+  success: boolean;
+  output?: string;
+  exit_code?: number;
+  session_name?: string;
+  command?: string;
+  error?: string;
+}
+
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -79,7 +88,9 @@ export interface AgentEvent {
     | "read_file_end"
     | "sandbox_creating"
     | "sandbox_ready"
-    | "sandbox_error";
+    | "sandbox_error"
+    | "shell_exec_start"
+    | "shell_exec_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -87,11 +98,13 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult;
+  result?: ToolResult | ReadFileResult | ShellResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
   file_path?: string;
+  session_name?: string;
+  command?: string;
 }
 
 export interface Model {
@@ -127,7 +140,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read";
@@ -136,6 +149,10 @@ export interface ChatEntry {
   arguments?: Record<string, unknown>;
   result?: ToolResult;
   readResult?: ReadFileResult;
+  shellResult?: ShellResult;
+  shellCommand?: string;
+  shellSessionName?: string;
+  shellStatus?: "running" | "completed" | "error";
   timestamp: Date;
   isStreaming?: boolean;
   sandboxStatus?: "creating" | "ready" | "error";

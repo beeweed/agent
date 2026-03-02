@@ -1,6 +1,6 @@
 import type { ChatEntry } from "@/types";
 import { useStore } from "@/store/useStore";
-import { Code, Eye, Check, Loader2, AlertCircle, BookOpen } from "lucide-react";
+import { Code, Eye, Check, Loader2, AlertCircle, BookOpen, Terminal } from "lucide-react";
 import { MessageContent } from "./MessageContent";
 
 function AnygentLogo() {
@@ -175,6 +175,70 @@ export function ChatMessage({ entry }: ChatMessageProps) {
               <Eye className="w-2.5 h-2.5 xs:w-3 xs:h-3" />
               <span className="hidden xs:inline">View</span>
             </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (entry.type === "shell_card") {
+    const isRunning = entry.shellStatus === "running";
+    const isCompleted = entry.shellStatus === "completed";
+    const isError = entry.shellStatus === "error";
+
+    const handleTerminalClick = () => {
+      setRightPanel("terminal");
+      setMobileTab("terminal");
+    };
+
+    return (
+      <div data-design-id={`shell-card-${entry.id}`} className="animate-fade-in pl-6 xs:pl-8 sm:pl-10">
+        <div
+          onClick={handleTerminalClick}
+          className={`flex flex-col gap-2 px-3 xs:px-4 py-2 xs:py-3 rounded-lg bg-[#1e1e1e] border border-[#333] text-[11px] xs:text-sm cursor-pointer transition-all hover:border-[#444] ${
+            isRunning ? "animate-pulse" : ""
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 xs:gap-2">
+              {isRunning && (
+                <Loader2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-green-400 animate-spin" />
+              )}
+              {isCompleted && (
+                <Check className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-green-400" />
+              )}
+              {isError && (
+                <AlertCircle className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-red-400" />
+              )}
+              <Terminal className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-green-400" />
+            </div>
+            
+            <span className="text-green-400 font-mono text-xs">
+              {entry.shellSessionName || "main"}
+            </span>
+          </div>
+          
+          <div className="font-mono text-gray-300 text-xs break-all">
+            <span className="text-cyan-400">user@e2b</span>
+            <span className="text-gray-500">:</span>
+            <span className="text-blue-400">~</span>
+            <span className="text-gray-500">$ </span>
+            <span className="text-gray-100">{entry.shellCommand}</span>
+          </div>
+          
+          {isCompleted && entry.shellResult?.output && (
+            <div className="font-mono text-gray-400 text-xs whitespace-pre-wrap max-h-32 overflow-y-auto border-t border-[#333] pt-2 mt-1">
+              {entry.shellResult.output.length > 500 
+                ? entry.shellResult.output.slice(0, 500) + "...\n[Output truncated]"
+                : entry.shellResult.output
+              }
+            </div>
+          )}
+          
+          {isError && entry.shellResult?.error && (
+            <div className="font-mono text-red-400 text-xs whitespace-pre-wrap border-t border-[#333] pt-2 mt-1">
+              Error: {entry.shellResult.error}
+            </div>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Sandbox } from "e2b";
-import { useStore } from "@/store/useStore";
+import { useStore, type TerminalBufferData } from "@/store/useStore";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -39,7 +39,15 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export function TerminalPanel() {
-  const { e2bApiKey, sandboxStatus } = useStore();
+  const { 
+    e2bApiKey, 
+    sandboxStatus, 
+    pendingShellCommands,
+    consumePendingShellCommand,
+    terminalBuffers,
+    setTerminalBuffer,
+    appendTerminalBuffer,
+  } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
@@ -285,6 +293,19 @@ export function TerminalPanel() {
       const cols = xterm.cols;
       const rows = xterm.rows;
 
+      // Initialize terminal buffer in store
+      const existingBuffer = terminalBuffers[terminalId];
+      if (!existingBuffer) {
+        setTerminalBuffer(terminalId, {
+          id: terminalId,
+          name: terminals.find(t => t.id === terminalId)?.name || terminalId,
+          buffer: "",
+        });
+      } else {
+        // Restore existing buffer content
+        xterm.write(existingBuffer.buffer);
+      }
+
       const terminal = await createTerminal(
         terminalId,
         cols,
@@ -292,7 +313,10 @@ export function TerminalPanel() {
         (data: Uint8Array) => {
           xterm.write(data);
 
+          // Store output in buffer for persistence
           const text = new TextDecoder().decode(data);
+          appendTerminalBuffer(terminalId, text);
+
           const promptPatterns = [
             /\$\s*$/,
             />\s*$/,
@@ -325,7 +349,7 @@ export function TerminalPanel() {
 
       setIsInitializing(null);
     },
-    [createTerminal, sendTerminalInput, triggerSync]
+    [createTerminal, sendTerminalInput, triggerSync, terminalBuffers, setTerminalBuffer, appendTerminalBuffer, terminals]
   );
 
   useEffect(() => {
@@ -367,6 +391,42 @@ export function TerminalPanel() {
     }
   }, [activeTerminalId, isExpanded]);
 
+  // Process pending shell commands from LLM
+  useEffect(() => {
+    const processPendingCommands = async () => {
+      if (pendingShellCommands.length === 0) return;
+      if (!sandboxRef.current) return;
+      if (terminals.length === 0) return;
+
+      // Get the first pending command
+      const command = consumePendingShellCommand();
+      if (!command) return;
+
+      // Find or use the first terminal
+      const targetTerminalId = activeTerminalId || terminals[0]?.id;
+      if (!targetTerminalId) return;
+
+      const terminalInfo = terminalsRef.current.get(targetTerminalId);
+      if (!terminalInfo) return;
+
+      console.log(`[SHELL] Executing command in terminal: ${command.command}`);
+
+      try {
+        // Send the command to the terminal
+        await sandboxRef.current.pty.sendInput(
+          terminalInfo.pid,
+          new TextEncoder().encode(command.command + "\n")
+        );
+      } catch (error) {
+        console.error("[SHELL] Failed to execute command:", error);
+      }
+    };
+
+    processPendingCommands();
+  }, [pendingShellCommands, activeTerminalId, terminals, consumePendingShellCommand]);
+
+  const { clearTerminalBuffer } = useStore();
+  
   const handleCloseTerminal = useCallback(
     async (terminalId: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -379,6 +439,9 @@ export function TerminalPanel() {
 
       await closeTerminal(terminalId);
       terminalRefs.current.delete(terminalId);
+      
+      // Clear the terminal buffer from storage
+      clearTerminalBuffer(terminalId);
 
       setTerminals((prev) => {
         const newTerminals = prev.filter((t) => t.id !== terminalId);
@@ -390,7 +453,7 @@ export function TerminalPanel() {
         return newTerminals;
       });
     },
-    [activeTerminalId, closeTerminal]
+    [activeTerminalId, closeTerminal, clearTerminalBuffer]
   );
 
   const handleManualSync = () => {
