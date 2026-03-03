@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Sandbox } from "e2b";
-import { useStore, type TerminalBufferData } from "@/store/useStore";
+import { useStore } from "@/store/useStore";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,

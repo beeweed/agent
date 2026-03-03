@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ShellResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -66,8 +66,6 @@ export function ChatPanel() {
     setSandboxStatus,
     setCodeStreaming,
     resetCodeStreaming,
-    addPendingShellCommand,
-    setRightPanel,
   } = useStore();
   
   const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent } = useApi();
@@ -304,7 +302,7 @@ export function ChatPanel() {
               const command = event.command || "";
               console.log("[SHELL_EXEC_START]", sessionName, command);
               
-              // Create shell card entry
+              // Create shell card entry with embedded terminal
               const shellEntry: ChatEntry = {
                 id: crypto.randomUUID(),
                 type: "shell_card",
@@ -316,33 +314,16 @@ export function ChatPanel() {
               };
               currentShellCardId = shellEntry.id;
               addChatEntry(shellEntry);
-              
-              // Add command to pending queue for terminal to execute
-              addPendingShellCommand({
-                sessionName,
-                command,
-                timestamp: Date.now(),
-              });
-              
-              // Switch to terminal panel to show execution
-              setRightPanel("terminal");
+              // The EmbeddedTerminal component will handle execution directly
             }
             break;
           
           case "shell_exec_end":
             {
-              const result = event.result as ShellResult;
-              console.log("[SHELL_EXEC_END]", event.command, result?.success);
-              
-              // Update the shell card with result
-              if (currentShellCardId) {
-                updateChatEntry(currentShellCardId, {
-                  shellStatus: result?.success ? "completed" : "error",
-                  shellResult: result,
-                });
-                currentShellCardId = null;
-              }
-              
+              // The EmbeddedTerminal component handles updating the status
+              // Just reset the current shell card ID
+              console.log("[SHELL_EXEC_END]", event.command);
+              currentShellCardId = null;
               // Refresh file tree after shell command
               fetchFileTree();
             }
