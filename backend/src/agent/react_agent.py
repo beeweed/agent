@@ -2,12 +2,54 @@ import json
 import asyncio
 import uuid
 import re
-from typing import AsyncGenerator, Optional, Callable
+from typing import AsyncGenerator, Optional, Callable, Dict, Any
 from .models import ContextWindow, AgentState
 from .system_prompt import get_system_prompt
 from ..services.openrouter import chat_completion, chat_completion_non_streaming
 from ..services.e2b_sandbox import sandbox_manager
 from ..tools.shell import SHELL_TOOL_DEFINITION
+
+
+# Global storage for pending shell command outputs
+# Key: command_id, Value: {"output": str, "completed": bool, "error": str | None}
+_pending_shell_outputs: Dict[str, Dict[str, Any]] = {}
+_shell_output_events: Dict[str, asyncio.Event] = {}
+
+
+def register_shell_command(command_id: str) -> asyncio.Event:
+    """Register a pending shell command and return an event to wait on."""
+    _pending_shell_outputs[command_id] = {
+        "output": "",
+        "completed": False,
+        "error": None,
+        "success": None
+    }
+    _shell_output_events[command_id] = asyncio.Event()
+    return _shell_output_events[command_id]
+
+
+def submit_shell_output(command_id: str, output: str, success: bool = True, error: str = None):
+    """Submit shell command output from frontend."""
+    if command_id in _pending_shell_outputs:
+        _pending_shell_outputs[command_id] = {
+            "output": output,
+            "completed": True,
+            "success": success,
+            "error": error
+        }
+        if command_id in _shell_output_events:
+            _shell_output_events[command_id].set()
+
+
+def get_shell_output(command_id: str) -> Dict[str, Any]:
+    """Get the shell output for a command."""
+    return _pending_shell_outputs.get(command_id, {"output": "", "completed": False, "error": None})
+
+
+def cleanup_shell_command(command_id: str):
+    """Clean up after shell command completes."""
+    _pending_shell_outputs.pop(command_id, None)
+    _shell_output_events.pop(command_id, None)
 
 
 # Tool definitions for E2B sandbox operations
@@ -325,12 +367,20 @@ class ReActAgent:
         
         return result
     
-    async def _execute_shell(self, arguments: dict) -> dict:
+    async def _execute_shell(self, arguments: dict, command_id: str = None) -> dict:
         """
-        Execute the shell tool - runs a command in the E2B sandbox.
+        Execute the shell tool - dispatches command to frontend terminal only.
         
-        This method runs commands in the sandbox and returns the output.
-        The frontend terminal will show the command execution in real-time.
+        IMPORTANT: This method does NOT execute commands directly in the backend.
+        Instead, it waits for the frontend EmbeddedTerminal to execute the command
+        and return the output. This ensures single execution in the XTerm terminal.
+        
+        Flow:
+        1. Register pending command with command_id
+        2. Return immediately (shell_exec_start event triggers frontend execution)
+        3. Frontend executes in XTerm and POSTs output to /api/shell/output
+        4. This method receives the output via asyncio event
+        5. Return full terminal output to LLM
         """
         session_name = arguments.get("session_name", "main")
         command = arguments.get("command", "")
@@ -342,8 +392,14 @@ class ReActAgent:
                 "session_name": session_name
             }
         
+        if not command_id:
+            command_id = str(uuid.uuid4())
+        
+        # Store command_id for the current shell execution
+        self._current_shell_command_id = command_id
+        
         try:
-            # Get the sandbox
+            # Verify sandbox exists
             sandbox = await sandbox_manager.get_sandbox(self.session_id)
             if not sandbox:
                 return {
@@ -352,32 +408,48 @@ class ReActAgent:
                     "session_name": session_name
                 }
             
-            # Run the command using sandbox.commands.run for simple execution
-            # This captures output properly
-            result = await sandbox.commands.run(
-                command,
-                cwd="/home/user",
-                timeout=120
-            )
+            # Register this command and get event to wait on
+            completion_event = register_shell_command(command_id)
             
-            # Combine stdout and stderr
-            output = ""
-            if result.stdout:
-                output += result.stdout
-            if result.stderr:
-                if output:
-                    output += "\n"
-                output += result.stderr
+            # Wait for frontend to execute and submit output
+            # Timeout after 300 seconds (5 minutes) for long-running commands
+            try:
+                await asyncio.wait_for(completion_event.wait(), timeout=300)
+            except asyncio.TimeoutError:
+                cleanup_shell_command(command_id)
+                return {
+                    "success": False,
+                    "error": "Command execution timed out waiting for terminal output",
+                    "session_name": session_name,
+                    "command": command
+                }
+            
+            # Get the output submitted by frontend
+            result = get_shell_output(command_id)
+            cleanup_shell_command(command_id)
+            
+            output = result.get("output", "")
+            success = result.get("success", True)
+            error = result.get("error")
+            
+            if error:
+                return {
+                    "success": False,
+                    "error": error,
+                    "output": output,
+                    "session_name": session_name,
+                    "command": command
+                }
             
             return {
-                "success": result.exit_code == 0,
+                "success": success,
                 "output": output.strip() if output else "(no output)",
-                "exit_code": result.exit_code,
                 "session_name": session_name,
                 "command": command
             }
             
         except Exception as e:
+            cleanup_shell_command(command_id)
             return {
                 "success": False,
                 "error": str(e),
@@ -624,7 +696,10 @@ class ReActAgent:
                                 }
                             
                             # Emit shell_exec_start event before executing shell tool
+                            # Generate unique command_id for frontend-backend coordination
+                            shell_command_id = None
                             if tool_name == "shell":
+                                shell_command_id = str(uuid.uuid4())
                                 session_name = arguments.get("session_name", "main")
                                 command = arguments.get("command", "")
                                 yield {
@@ -633,10 +708,15 @@ class ReActAgent:
                                     "tool_name": tool_name,
                                     "session_name": session_name,
                                     "command": command,
+                                    "command_id": shell_command_id,  # Frontend uses this to POST output back
                                     "iteration": self.current_iteration
                                 }
                             
-                            result = await self.tool_executors[tool_name](arguments)
+                            # For shell commands, pass the command_id for output coordination
+                            if tool_name == "shell":
+                                result = await self.tool_executors[tool_name](arguments, command_id=shell_command_id)
+                            else:
+                                result = await self.tool_executors[tool_name](arguments)
                             result_str = json.dumps(result)
                             
                             self.context.add_tool_result(tool_id, tool_name, result_str)

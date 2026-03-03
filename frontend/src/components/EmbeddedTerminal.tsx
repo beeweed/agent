@@ -17,6 +17,7 @@ interface EmbeddedTerminalProps {
   command: string;
   sessionName?: string;
   entryId: string;
+  commandId?: string;  // Used to POST output back to backend for LLM
   onOutputCapture?: (output: string) => void;
 }
 
@@ -32,8 +33,9 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-export function EmbeddedTerminal({ command, sessionName = "main", entryId, onOutputCapture }: EmbeddedTerminalProps) {
+export function EmbeddedTerminal({ command, sessionName = "main", entryId, commandId, onOutputCapture }: EmbeddedTerminalProps) {
   const { e2bApiKey, sandboxStatus, updateChatEntry } = useStore();
+  const outputSubmittedRef = useRef(false);  // Prevent double submission
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -164,15 +166,37 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, onOut
               );
               
               if (hasPrompt && outputBufferRef.current.trim().length > 0) {
-                // Command completed
+                // Command completed - but only submit once
+                if (outputSubmittedRef.current) return;
+                outputSubmittedRef.current = true;
+                
                 setStatus("completed");
+                
+                const capturedOutput = outputBufferRef.current;
+                
+                // CRITICAL: POST output back to backend for LLM
+                // This is the single source of truth for command execution
+                if (commandId) {
+                  fetch(`${API_BASE}/api/shell/output`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      command_id: commandId,
+                      output: capturedOutput,
+                      success: true,
+                      error: null
+                    }),
+                  }).catch((err) => {
+                    console.error("[SHELL_OUTPUT] Failed to submit output:", err);
+                  });
+                }
                 
                 // Update the chat entry with the captured output
                 updateChatEntry(entryId, {
                   shellStatus: "completed",
                   shellResult: {
                     success: true,
-                    output: outputBufferRef.current,
+                    output: capturedOutput,
                     session_name: sessionName,
                     command: command,
                   },
@@ -180,7 +204,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, onOut
                 
                 // Call the output capture callback
                 if (onOutputCapture) {
-                  onOutputCapture(outputBufferRef.current);
+                  onOutputCapture(capturedOutput);
                 }
                 
                 // Refresh file tree after command
@@ -219,11 +243,29 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, onOut
       } catch (error) {
         console.error("Failed to initialize embedded terminal:", error);
         setStatus("error");
+        
+        const errorMessage = error instanceof Error ? error.message : "Failed to initialize terminal";
+        
+        // POST error back to backend so LLM knows the command failed
+        if (commandId && !outputSubmittedRef.current) {
+          outputSubmittedRef.current = true;
+          fetch(`${API_BASE}/api/shell/output`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              command_id: commandId,
+              output: "",
+              success: false,
+              error: errorMessage
+            }),
+          }).catch(console.error);
+        }
+        
         updateChatEntry(entryId, {
           shellStatus: "error",
           shellResult: {
             success: false,
-            error: error instanceof Error ? error.message : "Failed to initialize terminal",
+            error: errorMessage,
             session_name: sessionName,
             command: command,
           },
@@ -242,7 +284,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, onOut
         sandboxRef.current.pty.kill(terminalPidRef.current).catch(console.error);
       }
     };
-  }, [sandboxId, e2bApiKey, command, sessionName, entryId, updateChatEntry, onOutputCapture]);
+  }, [sandboxId, e2bApiKey, command, sessionName, entryId, commandId, updateChatEntry, onOutputCapture]);
 
   // Handle resize
   useEffect(() => {

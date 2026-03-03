@@ -189,6 +189,7 @@ export function ChatMessage({ entry }: ChatMessageProps) {
           command={entry.shellCommand || ""}
           sessionName={entry.shellSessionName || "main"}
           entryId={entry.id}
+          commandId={entry.shellCommandId || ""}
         />
       </div>
     );

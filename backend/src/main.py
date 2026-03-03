@@ -6,7 +6,7 @@ from typing import Optional, Dict
 import json
 import asyncio
 
-from .agent.react_agent import ReActAgent
+from .agent.react_agent import ReActAgent, submit_shell_output
 from .services.openrouter import fetch_models
 from .services.e2b_sandbox import sandbox_manager
 
@@ -71,6 +71,40 @@ class TerminalResizeRequest(BaseModel):
 class TerminalCloseRequest(BaseModel):
     terminal_id: str
     session_id: Optional[str] = "default"
+
+
+class ShellOutputRequest(BaseModel):
+    """Request model for submitting shell command output from frontend terminal."""
+    command_id: str
+    output: str
+    success: bool = True
+    error: Optional[str] = None
+
+
+@app.post("/api/shell/output")
+async def submit_shell_command_output(request: ShellOutputRequest):
+    """
+    Receive shell command output from frontend EmbeddedTerminal.
+    
+    This endpoint is called by the frontend after a command completes
+    in the XTerm terminal. The output is then returned to the LLM.
+    
+    This is the key mechanism for ensuring single execution:
+    - Backend emits shell_exec_start with command_id
+    - Frontend executes command in XTerm
+    - Frontend POSTs output here
+    - Backend receives output and returns to LLM
+    """
+    try:
+        submit_shell_output(
+            command_id=request.command_id,
+            output=request.output,
+            success=request.success,
+            error=request.error
+        )
+        return {"success": True, "message": "Shell output received"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")

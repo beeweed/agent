@@ -300,21 +300,24 @@ export function ChatPanel() {
             {
               const sessionName = event.session_name || "main";
               const command = event.command || "";
-              console.log("[SHELL_EXEC_START]", sessionName, command);
+              const commandId = event.command_id || "";
+              console.log("[SHELL_EXEC_START]", sessionName, command, "command_id:", commandId);
               
               // Create shell card entry with embedded terminal
+              // Include command_id so EmbeddedTerminal can POST output back to backend
               const shellEntry: ChatEntry = {
                 id: crypto.randomUUID(),
                 type: "shell_card",
                 shellCommand: command,
                 shellSessionName: sessionName,
                 shellStatus: "running",
+                shellCommandId: commandId,  // Critical: used for output coordination
                 iteration: event.iteration,
                 timestamp: new Date(),
               };
               currentShellCardId = shellEntry.id;
               addChatEntry(shellEntry);
-              // The EmbeddedTerminal component will handle execution directly
+              // The EmbeddedTerminal component will handle execution and POST output
             }
             break;
           

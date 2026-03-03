@@ -105,6 +105,7 @@ export interface AgentEvent {
   file_path?: string;
   session_name?: string;
   command?: string;
+  command_id?: string;  // Used to coordinate shell output between frontend and backend
 }
 
 export interface Model {
@@ -153,6 +154,7 @@ export interface ChatEntry {
   shellCommand?: string;
   shellSessionName?: string;
   shellStatus?: "running" | "completed" | "error";
+  shellCommandId?: string;  // Used to POST output back to backend
   timestamp: Date;
   isStreaming?: boolean;
   sandboxStatus?: "creating" | "ready" | "error";
