@@ -64,6 +64,7 @@ export interface ShellResult {
   session_name?: string;
   command?: string;
   error?: string;
+  urls?: string[];  // Extracted localhost URLs for dev servers
 }
 
 export interface AgentEvent {
@@ -153,7 +154,7 @@ export interface ChatEntry {
   shellResult?: ShellResult;
   shellCommand?: string;
   shellSessionName?: string;
-  shellStatus?: "running" | "completed" | "error";
+  shellStatus?: "running" | "completed" | "error" | "server_running";
   shellCommandId?: string;  // Used to POST output back to backend
   timestamp: Date;
   isStreaming?: boolean;

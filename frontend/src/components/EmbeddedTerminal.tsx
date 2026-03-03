@@ -3,6 +3,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Sandbox } from "e2b";
 import { useStore } from "@/store/useStore";
+import { isLongRunningCommand, detectServerStatus } from "@/lib/serverDetection";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   Maximize2,
   Minimize2,
+  Server,
 } from "lucide-react";
 
 interface EmbeddedTerminalProps {
@@ -39,10 +41,12 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [status, setStatus] = useState<"connecting" | "running" | "completed" | "error">("connecting");
+  const [status, setStatus] = useState<"connecting" | "running" | "completed" | "error" | "server_running">("connecting");
   const [sandboxId, setSandboxId] = useState<string | null>(null);
   const [_isTerminalReady, setIsTerminalReady] = useState(false);
   const [_capturedOutput, setCapturedOutput] = useState("");
+  const [serverUrls, setServerUrls] = useState<string[]>([]);
+  const isLongRunning = isLongRunningCommand(command);
   
   const sandboxRef = useRef<Sandbox | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -150,17 +154,70 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
             outputBufferRef.current += text;
             setCapturedOutput(outputBufferRef.current);
             
-            // Check for command completion (prompt patterns)
-            const promptPatterns = [
-              /\$\s*$/,
-              />\s*$/,
-              /#\s*$/,
-              /\]\s*$/,
-              /~\]\$/,
-            ];
-            
             // Only check for completion after command was executed
             if (commandExecutedRef.current) {
+              // Check for long-running server commands first
+              if (isLongRunningCommand(command)) {
+                const serverStatus = detectServerStatus(command, outputBufferRef.current);
+                
+                if (serverStatus.isReady && !outputSubmittedRef.current) {
+                  // Server is ready - submit output and stop loading
+                  outputSubmittedRef.current = true;
+                  
+                  setStatus("server_running");
+                  setServerUrls(serverStatus.urls);
+                  
+                  const capturedOutput = outputBufferRef.current;
+                  
+                  // CRITICAL: POST output back to backend for LLM with server ready message
+                  if (commandId) {
+                    fetch(`${API_BASE}/api/shell/output`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        command_id: commandId,
+                        output: serverStatus.message,
+                        success: true,
+                        error: null
+                      }),
+                    }).catch((err) => {
+                      console.error("[SHELL_OUTPUT] Failed to submit server ready output:", err);
+                    });
+                  }
+                  
+                  // Update the chat entry with server running status
+                  updateChatEntry(entryId, {
+                    shellStatus: "server_running",
+                    shellResult: {
+                      success: true,
+                      output: serverStatus.message,
+                      session_name: sessionName,
+                      command: command,
+                      urls: serverStatus.urls,
+                    },
+                  });
+                  
+                  // Call the output capture callback
+                  if (onOutputCapture) {
+                    onOutputCapture(capturedOutput);
+                  }
+                  
+                  // Refresh file tree after server starts
+                  fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
+                  
+                  return; // Don't check for prompt patterns
+                }
+              }
+              
+              // Check for command completion (prompt patterns) for non-long-running commands
+              const promptPatterns = [
+                /\$\s*$/,
+                />\s*$/,
+                /#\s*$/,
+                /\]\s*$/,
+                /~\]\$/,
+              ];
+              
               const hasPrompt = promptPatterns.some((pattern) =>
                 pattern.test(outputBufferRef.current)
               );
@@ -349,11 +406,29 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
           {status === "completed" && (
             <Check className="w-4 h-4 text-green-400" />
           )}
+          {status === "server_running" && (
+            <Server className="w-4 h-4 text-cyan-400" />
+          )}
           {status === "error" && (
             <AlertCircle className="w-4 h-4 text-red-400" />
           )}
           <TerminalSquare className="w-4 h-4 text-green-400" />
           <span className="text-xs font-mono text-gray-400">{sessionName}</span>
+          {status === "server_running" && serverUrls.length > 0 && (
+            <div className="flex items-center gap-1 ml-2">
+              {serverUrls.map((url, idx) => (
+                <a
+                  key={idx}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30 transition-colors font-mono"
+                >
+                  {url}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
@@ -361,11 +436,13 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
             status === "connecting" ? "bg-yellow-500/20 text-yellow-400" :
             status === "running" ? "bg-green-500/20 text-green-400 animate-pulse" :
             status === "completed" ? "bg-green-500/20 text-green-400" :
+            status === "server_running" ? "bg-cyan-500/20 text-cyan-400" :
             "bg-red-500/20 text-red-400"
           }`}>
             {status === "connecting" ? "Connecting..." :
              status === "running" ? "Running..." :
              status === "completed" ? "Completed" :
+             status === "server_running" ? "Server Running" :
              "Error"}
           </span>
           
