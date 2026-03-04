@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Sandbox } from "e2b";
@@ -36,6 +36,7 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export function EmbeddedTerminal({ command, sessionName = "main", entryId, commandId, onOutputCapture }: EmbeddedTerminalProps) {
+  console.log("[EmbeddedTerminal] Mounted with command:", command, "commandId:", commandId, "isLongRunning:", isLongRunningCommand(command));
   const { e2bApiKey, sandboxStatus, updateChatEntry } = useStore();
   const outputSubmittedRef = useRef(false);  // Prevent double submission
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,6 +56,67 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
   const outputBufferRef = useRef<string>("");
   const commandExecutedRef = useRef(false);
   const initializedRef = useRef(false);
+  const serverDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Fallback timeout function to check for server ready state
+  const checkServerReadyFallback = useCallback(() => {
+    if (outputSubmittedRef.current || !isLongRunning) return;
+    
+    const serverStatus = detectServerStatus(command, outputBufferRef.current);
+    console.log("[SERVER_DETECTION_FALLBACK] Checking with accumulated output...", {
+      outputLength: outputBufferRef.current.length,
+      isReady: serverStatus.isReady,
+      urls: serverStatus.urls
+    });
+    
+    if (serverStatus.isReady && !outputSubmittedRef.current) {
+      console.log("[SERVER_DETECTION_FALLBACK] Server detected! Submitting...");
+      outputSubmittedRef.current = true;
+      setStatus("server_running");
+      setServerUrls(serverStatus.urls);
+      
+      if (commandId) {
+        console.log("[SHELL_OUTPUT_FALLBACK] POSTing to backend:", {
+          command_id: commandId,
+          output: serverStatus.message,
+          api_base: API_BASE
+        });
+        fetch(`${API_BASE}/api/shell/output`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            command_id: commandId,
+            output: serverStatus.message,
+            success: true,
+            error: null
+          }),
+        })
+        .then((res) => {
+          console.log("[SHELL_OUTPUT_FALLBACK] Response status:", res.status);
+          return res.json();
+        })
+        .then((data) => {
+          console.log("[SHELL_OUTPUT_FALLBACK] Response data:", data);
+        })
+        .catch((err) => {
+          console.error("[SHELL_OUTPUT_FALLBACK] Failed:", err);
+        });
+      }
+      
+      updateChatEntry(entryId, {
+        shellStatus: "server_running",
+        shellResult: {
+          success: true,
+          output: serverStatus.message,
+          session_name: sessionName,
+          command: command,
+          urls: serverStatus.urls,
+        },
+      });
+      
+      fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
+    }
+  }, [command, commandId, entryId, isLongRunning, sessionName, updateChatEntry]);
 
   // Fetch sandbox ID from backend
   useEffect(() => {
@@ -160,7 +222,12 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
               if (isLongRunningCommand(command)) {
                 const serverStatus = detectServerStatus(command, outputBufferRef.current);
                 
+                // Debug logging for server detection
+                console.log("[SERVER_DETECTION] Checking output for server ready state...");
+                console.log("[SERVER_DETECTION] isReady:", serverStatus.isReady, "urls:", serverStatus.urls);
+                
                 if (serverStatus.isReady && !outputSubmittedRef.current) {
+                  console.log("[SERVER_DETECTION] Server detected as ready! Submitting output...");
                   // Server is ready - submit output and stop loading
                   outputSubmittedRef.current = true;
                   
@@ -171,6 +238,11 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
                   
                   // CRITICAL: POST output back to backend for LLM with server ready message
                   if (commandId) {
+                    console.log("[SHELL_OUTPUT] POSTing server ready output to backend:", {
+                      command_id: commandId,
+                      output: serverStatus.message,
+                      api_base: API_BASE
+                    });
                     fetch(`${API_BASE}/api/shell/output`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -180,7 +252,15 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
                         success: true,
                         error: null
                       }),
-                    }).catch((err) => {
+                    })
+                    .then((res) => {
+                      console.log("[SHELL_OUTPUT] Backend response status:", res.status);
+                      return res.json();
+                    })
+                    .then((data) => {
+                      console.log("[SHELL_OUTPUT] Backend response data:", data);
+                    })
+                    .catch((err) => {
                       console.error("[SHELL_OUTPUT] Failed to submit server ready output:", err);
                     });
                   }
@@ -294,6 +374,19 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
               terminalPidRef.current,
               new TextEncoder().encode(command + "\n")
             );
+            
+            // For long-running commands, set up fallback detection timers
+            // These will periodically check if the server is ready in case the
+            // real-time detection in onData didn't catch it
+            if (isLongRunning) {
+              console.log("[SERVER_DETECTION] Setting up fallback timers for long-running command");
+              // Check after 2 seconds
+              setTimeout(checkServerReadyFallback, 2000);
+              // Check after 5 seconds
+              setTimeout(checkServerReadyFallback, 5000);
+              // Check after 10 seconds
+              setTimeout(checkServerReadyFallback, 10000);
+            }
           }
         }, 300);
 
@@ -341,7 +434,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
         sandboxRef.current.pty.kill(terminalPidRef.current).catch(console.error);
       }
     };
-  }, [sandboxId, e2bApiKey, command, sessionName, entryId, commandId, updateChatEntry, onOutputCapture]);
+  }, [sandboxId, e2bApiKey, command, sessionName, entryId, commandId, updateChatEntry, onOutputCapture, isLongRunning, checkServerReadyFallback]);
 
   // Handle resize
   useEffect(() => {

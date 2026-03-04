@@ -6,6 +6,25 @@
  */
 
 /**
+ * Strip ANSI escape codes from terminal output.
+ * Terminal output often contains color codes like \x1b[32m that interfere with regex matching.
+ */
+function stripAnsiCodes(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text
+    // Standard SGR (colors, bold, etc.): \x1b[0m, \x1b[32m, \x1b[1;32m
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+    // Private mode sequences: \x1b[?25h, \x1b[?25l (cursor show/hide)
+    .replace(/\x1b\[\?[0-9;]*[a-zA-Z]/g, '')
+    // OSC sequences: \x1b]0;title\x07 (terminal title)
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    // CSI sequences with parameters: \x1b[H, \x1b[2J
+    .replace(/\x1b\[[0-9;]*[HJKfm]/g, '')
+    // Strip carriage returns that might cause issues
+    .replace(/\r/g, '');
+}
+
+/**
  * Patterns that indicate a command is long-running (dev server)
  */
 const LONG_RUNNING_PATTERNS = [
@@ -104,14 +123,18 @@ export function isLongRunningCommand(command: string): boolean {
  * Check if the output indicates the server is ready
  */
 export function isServerReady(output: string): boolean {
-  return SERVER_READY_PATTERNS.some(pattern => pattern.test(output));
+  // Strip ANSI codes before matching - terminal output contains color codes
+  const cleanOutput = stripAnsiCodes(output);
+  return SERVER_READY_PATTERNS.some(pattern => pattern.test(cleanOutput));
 }
 
 /**
  * Extract all localhost URLs from the output
  */
 export function extractLocalhostUrls(output: string): string[] {
-  const matches = output.match(LOCALHOST_URL_PATTERN);
+  // Strip ANSI codes before extracting URLs
+  const cleanOutput = stripAnsiCodes(output);
+  const matches = cleanOutput.match(LOCALHOST_URL_PATTERN);
   if (!matches) return [];
   
   // Remove duplicates and clean up URLs
