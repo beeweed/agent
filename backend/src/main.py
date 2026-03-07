@@ -32,6 +32,7 @@ class ChatRequest(BaseModel):
     model: str = "anthropic/claude-3.5-sonnet"
     session_id: Optional[str] = None
     e2b_api_key: Optional[str] = None
+    e2b_template_id: Optional[str] = None
 
 
 class ModelsRequest(BaseModel):
@@ -151,13 +152,15 @@ async def chat(request: ChatRequest):
             model=request.model,
             max_iterations=500,
             e2b_api_key=request.e2b_api_key,
-            session_id=session_id  # Pass session_id for sandbox consistency
+            session_id=session_id,  # Pass session_id for sandbox consistency
+            e2b_template_id=request.e2b_template_id or ""
         )
     else:
         agents[session_id].api_key = request.api_key
         agents[session_id].model = request.model
         agents[session_id].e2b_api_key = request.e2b_api_key
         agents[session_id].session_id = session_id
+        agents[session_id].e2b_template_id = request.e2b_template_id or ""
     
     agent = agents[session_id]
     

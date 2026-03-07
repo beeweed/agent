@@ -300,12 +300,14 @@ class ReActAgent:
         model: str = "anthropic/claude-3.5-sonnet",
         max_iterations: int = 500,
         e2b_api_key: str = "",
-        session_id: str = "default"
+        session_id: str = "default",
+        e2b_template_id: str = ""
     ):
         self.api_key = api_key
         self.model = model
         self.max_iterations = max_iterations
         self.e2b_api_key = e2b_api_key
+        self.e2b_template_id = e2b_template_id
         self.context = ContextWindow()
         self.current_iteration = 0
         self.is_running = False
@@ -475,7 +477,8 @@ class ReActAgent:
         result = await sandbox_manager.create_sandbox(
             self.session_id,
             self.e2b_api_key,
-            timeout=300  # 5 minutes
+            timeout=300,  # 5 minutes
+            template_id=self.e2b_template_id
         )
         
         if result.get("success"):

@@ -16,7 +16,7 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export function useApi() {
-  const { apiKey, e2bApiKey, selectedModel, setModels, setModelsLoading, setFileTree, setMemory } = useStore();
+  const { apiKey, e2bApiKey, e2bTemplateId, selectedModel, setModels, setModelsLoading, setFileTree, setMemory } = useStore();
 
   const fetchModels = useCallback(async () => {
     if (!apiKey) return;
@@ -50,6 +50,7 @@ export function useApi() {
           api_key: apiKey,
           model: selectedModel,
           e2b_api_key: e2bApiKey,
+          e2b_template_id: e2bTemplateId || undefined,
         }),
       });
 
@@ -83,7 +84,7 @@ export function useApi() {
         }
       }
     },
-    [apiKey, e2bApiKey, selectedModel]
+    [apiKey, e2bApiKey, e2bTemplateId, selectedModel]
   );
 
   const fetchFileTree = useCallback(async () => {

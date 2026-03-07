@@ -31,6 +31,9 @@ interface AppState {
   e2bApiKey: string;
   setE2bApiKey: (key: string) => void;
   
+  e2bTemplateId: string;
+  setE2bTemplateId: (id: string) => void;
+  
   sandboxStatus: SandboxStatus;
   setSandboxStatus: (status: SandboxStatus) => void;
   
@@ -118,6 +121,9 @@ export const useStore = create<AppState>()(
       
       e2bApiKey: "",
       setE2bApiKey: (key) => set({ e2bApiKey: key }),
+      
+      e2bTemplateId: "",
+      setE2bTemplateId: (id) => set({ e2bTemplateId: id }),
       
       sandboxStatus: "idle",
       setSandboxStatus: (status) => set({ sandboxStatus: status }),
@@ -255,6 +261,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         apiKey: state.apiKey,
         e2bApiKey: state.e2bApiKey,
+        e2bTemplateId: state.e2bTemplateId,
         selectedModel: state.selectedModel,
         terminalBuffers: state.terminalBuffers,
       }),

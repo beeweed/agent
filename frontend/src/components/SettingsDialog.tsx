@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Box, Key } from "lucide-react";
+import { Box, Key, Layers } from "lucide-react";
 
 export function SettingsDialog() {
   const {
@@ -19,17 +19,21 @@ export function SettingsDialog() {
     setApiKey,
     e2bApiKey,
     setE2bApiKey,
+    e2bTemplateId,
+    setE2bTemplateId,
     models,
   } = useStore();
   
   const { fetchModels } = useApi();
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localE2bApiKey, setLocalE2bApiKey] = useState(e2bApiKey);
+  const [localE2bTemplateId, setLocalE2bTemplateId] = useState(e2bTemplateId);
 
   useEffect(() => {
     setLocalApiKey(apiKey);
     setLocalE2bApiKey(e2bApiKey);
-  }, [apiKey, e2bApiKey]);
+    setLocalE2bTemplateId(e2bTemplateId);
+  }, [apiKey, e2bApiKey, e2bTemplateId]);
 
   useEffect(() => {
     if (isSettingsOpen && apiKey && models.length === 0) {
@@ -40,6 +44,7 @@ export function SettingsDialog() {
   const handleSave = () => {
     setApiKey(localApiKey);
     setE2bApiKey(localE2bApiKey);
+    setE2bTemplateId(localE2bTemplateId);
     if (localApiKey && localApiKey !== apiKey) {
       fetchModels();
     }
@@ -133,6 +138,31 @@ export function SettingsDialog() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
+          </div>
+
+          {/* E2B Sandbox Template Section */}
+          <div data-design-id="e2b-template-section" className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-purple-500" />
+              <label className="text-sm font-medium text-foreground">E2B Sandbox Template</label>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Optional</span>
+            </div>
+            <div className="bg-muted rounded-xl p-4 border border-border">
+              <Input
+                data-design-id="e2b-template-input"
+                type="text"
+                placeholder="Enter your E2B sandbox template ID"
+                value={localE2bTemplateId}
+                onChange={(e) => setLocalE2bTemplateId(e.target.value)}
+                className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+              />
+            </div>
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>If provided, all new sandboxes will be created using this E2B template.</span>
+            </div>
           </div>
 
           {/* Warning if E2B key is missing */}

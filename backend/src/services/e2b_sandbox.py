@@ -40,7 +40,8 @@ class E2BSandboxManager:
         self,
         session_id: str,
         api_key: str,
-        timeout: int = None
+        timeout: int = None,
+        template_id: str = None
     ) -> dict:
         """
         Create a new E2B sandbox for a session or reconnect to existing one.
@@ -49,6 +50,7 @@ class E2BSandboxManager:
             session_id: Unique session identifier
             api_key: E2B API key
             timeout: Sandbox timeout in seconds (default: 1 hour, max: 24 hours)
+            template_id: Optional E2B template ID to use for sandbox creation
             
         Returns:
             Dictionary with sandbox creation result
@@ -91,11 +93,30 @@ class E2BSandboxManager:
                         "session_id": session_id
                     }
             
-            # Create new sandbox using base template with extended timeout
-            sandbox = await AsyncSandbox.create(
-                api_key=api_key,
-                timeout=timeout
-            )
+            # Create new sandbox using template (if provided) or base template
+            create_kwargs = {
+                "api_key": api_key,
+                "timeout": timeout
+            }
+            
+            # Use custom template if provided
+            if template_id and template_id.strip():
+                create_kwargs["template"] = template_id.strip()
+                used_template = template_id.strip()
+            else:
+                used_template = "base"
+            
+            try:
+                sandbox = await AsyncSandbox.create(**create_kwargs)
+            except Exception as template_error:
+                # If template-based creation fails, return error with details
+                if template_id and template_id.strip():
+                    return {
+                        "success": False,
+                        "error": f"Failed to create sandbox with template '{template_id}': {str(template_error)}",
+                        "session_id": session_id
+                    }
+                raise template_error
             
             self.sandboxes[session_id] = sandbox
             
@@ -104,7 +125,7 @@ class E2BSandboxManager:
             sandbox_id = info.sandbox_id if hasattr(info, 'sandbox_id') else str(sandbox)
             self.sandbox_info[session_id] = {
                 "sandbox_id": sandbox_id,
-                "template": "base",
+                "template": used_template,
                 "timeout": timeout,
                 "status": "running"
             }
