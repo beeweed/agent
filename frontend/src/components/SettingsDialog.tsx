@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Box, Key, Layers } from "lucide-react";
+import { Box, Key, Layers, Plus } from "lucide-react";
+import { SandboxCreatorDialog } from "@/components/SandboxCreatorDialog";
 
 export function SettingsDialog() {
   const {
@@ -28,6 +29,11 @@ export function SettingsDialog() {
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localE2bApiKey, setLocalE2bApiKey] = useState(e2bApiKey);
   const [localE2bTemplateId, setLocalE2bTemplateId] = useState(e2bTemplateId);
+  const [isSandboxCreatorOpen, setIsSandboxCreatorOpen] = useState(false);
+
+  const handleTemplateCreated = (templateId: string) => {
+    setLocalE2bTemplateId(templateId);
+  };
 
   useEffect(() => {
     setLocalApiKey(apiKey);
@@ -142,10 +148,22 @@ export function SettingsDialog() {
 
           {/* E2B Sandbox Template Section */}
           <div data-design-id="e2b-template-section" className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-purple-500" />
-              <label className="text-sm font-medium text-foreground">E2B Sandbox Template</label>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Optional</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-purple-500" />
+                <label className="text-sm font-medium text-foreground">E2B Sandbox Template</label>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Optional</span>
+              </div>
+              <Button
+                data-design-id="create-template-button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSandboxCreatorOpen(true)}
+                className="h-7 text-xs border-purple-500/30 text-purple-500 hover:bg-purple-500/10 hover:text-purple-400"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Create Template
+              </Button>
             </div>
             <div className="bg-muted rounded-xl p-4 border border-border">
               <Input
@@ -198,6 +216,14 @@ export function SettingsDialog() {
           </Button>
         </div>
       </DialogContent>
+
+      {/* Sandbox Creator Dialog */}
+      <SandboxCreatorDialog
+        open={isSandboxCreatorOpen}
+        onOpenChange={setIsSandboxCreatorOpen}
+        initialApiKey={localE2bApiKey}
+        onTemplateCreated={handleTemplateCreated}
+      />
     </Dialog>
   );
 }
