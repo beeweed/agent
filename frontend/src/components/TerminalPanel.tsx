@@ -30,13 +30,16 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace(/\d+-/, "8000-");
+      return window.location.origin.replace(/\d+-/, "8080-");
     }
   }
-  return "http://localhost:8000";
+  return "http://localhost:8080";
 };
 
 const API_BASE = getApiBase();
+
+const MAX_RETRIES = 10;
+const RETRY_DELAY = 2000;
 
 export function TerminalPanel() {
   const { 
@@ -58,8 +61,10 @@ export function TerminalPanel() {
   const [terminalCounter, setTerminalCounter] = useState(1);
   const [sandboxId, setSandboxId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [_connectionError, _setConnectionError] = useState<string | null>(null);
   const [isSandboxConnected, setIsSandboxConnected] = useState(false);
+  const [connectRetryCount, setConnectRetryCount] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState("Initializing...");
 
   const sandboxRef = useRef<Sandbox | null>(null);
   const terminalsRef = useRef<
@@ -73,54 +78,104 @@ export function TerminalPanel() {
   // Check if fully connected
   const _isConnected = e2bApiKey && sandboxStatus === "ready" && isSandboxConnected;
 
-  // Fetch sandbox ID from backend
+  // Fetch sandbox ID from backend with retry
   useEffect(() => {
-    const fetchSandboxId = async () => {
+    let isMounted = true;
+    const retryTimeoutRef = { current: null as NodeJS.Timeout | null };
+    
+    const fetchSandboxId = async (attempt: number = 0) => {
+      if (!isMounted) return;
+      
+      setLoadingMessage(attempt > 0 
+        ? `Connecting to sandbox... (attempt ${attempt + 1})`
+        : "Connecting to sandbox...");
+      
       try {
         const response = await fetch(`${API_BASE}/api/sandbox/status`);
         const data = await response.json();
+        
+        if (!isMounted) return;
+        
         if (data.sandbox_id && data.is_running) {
           setSandboxId(data.sandbox_id);
+          setConnectRetryCount(0);
         } else {
           setSandboxId(null);
+          // Sandbox not ready, keep polling
+          setConnectRetryCount(attempt + 1);
+          setLoadingMessage("Waiting for sandbox to be ready...");
         }
       } catch (error) {
         console.error("Failed to fetch sandbox status:", error);
+        if (isMounted) {
+          setConnectRetryCount(attempt + 1);
+          setLoadingMessage(`Connection failed, retrying...`);
+        }
       }
     };
 
     if (e2bApiKey && sandboxStatus === "ready") {
-      fetchSandboxId();
-      // Poll for sandbox status
-      const interval = setInterval(fetchSandboxId, 5000);
-      return () => clearInterval(interval);
+      fetchSandboxId(0);
+      // Poll for sandbox status continuously
+      const interval = setInterval(() => fetchSandboxId(0), 3000);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      };
     }
   }, [e2bApiKey, sandboxStatus]);
 
-  // Connect to sandbox when we have the sandbox ID
+  // Connect to sandbox when we have the sandbox ID with retry
   useEffect(() => {
-    const connectToSandbox = async () => {
+    let isMounted = true;
+    let retryTimeout: NodeJS.Timeout | null = null;
+    
+    const connectToSandbox = async (attempt: number = 0) => {
       if (!sandboxId || !e2bApiKey || sandboxRef.current) return;
+      if (!isMounted) return;
 
       setIsConnecting(true);
       setConnectionError(null);
+      setLoadingMessage(attempt > 0 
+        ? `Connecting to sandbox... (attempt ${attempt + 1}/${MAX_RETRIES})`
+        : "Connecting to sandbox...");
 
       try {
         const sandbox = await Sandbox.connect(sandboxId, {
           apiKey: e2bApiKey,
         });
 
+        if (!isMounted) return;
+
         sandboxRef.current = sandbox;
         setIsSandboxConnected(true);
         setIsConnecting(false);
+        setConnectRetryCount(0);
       } catch (error: unknown) {
         console.error("Failed to connect to sandbox:", error);
-        setConnectionError(error instanceof Error ? error.message : "Failed to connect to sandbox");
-        setIsConnecting(false);
+        
+        if (!isMounted) return;
+        
+        if (attempt < MAX_RETRIES - 1) {
+          // Retry
+          setConnectRetryCount(attempt + 1);
+          setLoadingMessage(`Connection failed, retrying... (${attempt + 1}/${MAX_RETRIES})`);
+          retryTimeout = setTimeout(() => connectToSandbox(attempt + 1), RETRY_DELAY);
+        } else {
+          // Keep trying even after max retries
+          setLoadingMessage("Having trouble connecting... Still trying...");
+          retryTimeout = setTimeout(() => connectToSandbox(0), RETRY_DELAY * 2);
+        }
       }
     };
 
-    connectToSandbox();
+    connectToSandbox(0);
+    
+    return () => {
+      isMounted = false;
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
   }, [sandboxId, e2bApiKey]);
 
   const triggerSync = useCallback(() => {
@@ -498,39 +553,31 @@ export function TerminalPanel() {
     );
   }
 
-  if (isConnecting) {
+  if (isConnecting || !isSandboxConnected) {
     return (
       <div
         data-design-id="terminal-panel-connecting"
-        className="h-full flex flex-col items-center justify-center text-muted-foreground bg-background p-4"
+        className="h-full flex flex-col items-center justify-center text-muted-foreground bg-[#1e1e1e] p-4"
       >
-        <Loader2 size={48} className="mb-4 animate-spin text-primary" />
-        <p className="text-sm">Connecting to sandbox...</p>
-      </div>
-    );
-  }
-
-  if (connectionError) {
-    return (
-      <div
-        data-design-id="terminal-panel-error"
-        className="h-full flex flex-col items-center justify-center text-muted-foreground bg-background p-4"
-      >
-        <TerminalSquare size={48} className="mb-4 opacity-20 text-destructive" />
-        <p className="text-sm text-destructive text-center">Failed to connect to sandbox</p>
-        <p className="text-xs text-muted-foreground mt-2 text-center">{connectionError}</p>
-      </div>
-    );
-  }
-
-  if (!isSandboxConnected) {
-    return (
-      <div
-        data-design-id="terminal-panel-waiting"
-        className="h-full flex flex-col items-center justify-center text-muted-foreground bg-background p-4"
-      >
-        <Loader2 size={48} className="mb-4 animate-spin text-primary" />
-        <p className="text-sm text-center">Waiting for sandbox connection...</p>
+        <div className="relative mb-4">
+          <div className="w-12 h-12 rounded-full border-2 border-[#333] border-t-green-400 animate-spin" />
+          <TerminalSquare size={20} className="text-green-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+        </div>
+        <p className="text-sm text-gray-300">{loadingMessage}</p>
+        {connectRetryCount > 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            Attempt {connectRetryCount + 1}
+          </p>
+        )}
+        <div className="flex gap-1 mt-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-green-400/50 animate-pulse"
+              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+          ))}
+        </div>
       </div>
     );
   }

@@ -9,10 +9,10 @@ import {
   TerminalSquare,
   Loader2,
   Check,
-  AlertCircle,
   Maximize2,
   Minimize2,
   Server,
+  RefreshCw,
 } from "lucide-react";
 
 interface EmbeddedTerminalProps {
@@ -27,13 +27,16 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace(/\d+-/, "8000-");
+      return window.location.origin.replace(/\d+-/, "8080-");
     }
   }
-  return "http://localhost:8000";
+  return "http://localhost:8080";
 };
 
 const API_BASE = getApiBase();
+
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 2000;
 
 export function EmbeddedTerminal({ command, sessionName = "main", entryId, commandId, onOutputCapture }: EmbeddedTerminalProps) {
   console.log("[EmbeddedTerminal] Mounted with command:", command, "commandId:", commandId, "isLongRunning:", isLongRunningCommand(command));
@@ -47,6 +50,8 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
   const [_isTerminalReady, setIsTerminalReady] = useState(false);
   const [_capturedOutput, setCapturedOutput] = useState("");
   const [serverUrls, setServerUrls] = useState<string[]>([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState("Initializing terminal...");
   const isLongRunning = isLongRunningCommand(command);
   
   const sandboxRef = useRef<Sandbox | null>(null);
@@ -57,6 +62,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
   const commandExecutedRef = useRef(false);
   const initializedRef = useRef(false);
   const serverDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Fallback timeout function to check for server ready state
   const checkServerReadyFallback = useCallback(() => {
@@ -118,24 +124,77 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
     }
   }, [command, commandId, entryId, isLongRunning, sessionName, updateChatEntry]);
 
-  // Fetch sandbox ID from backend
+  // Fetch sandbox ID from backend with retry logic
   useEffect(() => {
-    const fetchSandboxId = async () => {
+    let isMounted = true;
+    
+    const fetchSandboxId = async (attempt: number = 0): Promise<void> => {
+      if (!isMounted) return;
+      
+      setLoadingMessage(attempt > 0 
+        ? `Connecting to sandbox... (attempt ${attempt + 1}/${MAX_RETRIES})`
+        : "Connecting to sandbox...");
+      
       try {
         const response = await fetch(`${API_BASE}/api/sandbox/status`);
         const data = await response.json();
+        
+        if (!isMounted) return;
+        
         if (data.sandbox_id && data.is_running) {
+          console.log("[EmbeddedTerminal] Sandbox connected:", data.sandbox_id);
           setSandboxId(data.sandbox_id);
+          setRetryCount(0);
+        } else if (attempt < MAX_RETRIES - 1) {
+          // Sandbox not ready yet, retry
+          console.log("[EmbeddedTerminal] Sandbox not ready, retrying in", RETRY_DELAY, "ms");
+          setRetryCount(attempt + 1);
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSandboxId(attempt + 1);
+          }, RETRY_DELAY);
+        } else {
+          // Max retries reached but keep waiting
+          console.log("[EmbeddedTerminal] Sandbox not ready after retries, will keep polling...");
+          setLoadingMessage("Waiting for sandbox to be ready...");
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSandboxId(0); // Reset retry count and try again
+          }, RETRY_DELAY * 2);
         }
       } catch (error) {
         console.error("Failed to fetch sandbox status:", error);
-        setStatus("error");
+        
+        if (!isMounted) return;
+        
+        if (attempt < MAX_RETRIES - 1) {
+          // Network error, retry
+          console.log("[EmbeddedTerminal] Network error, retrying...");
+          setRetryCount(attempt + 1);
+          setLoadingMessage(`Connection failed, retrying... (${attempt + 1}/${MAX_RETRIES})`);
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSandboxId(attempt + 1);
+          }, RETRY_DELAY);
+        } else {
+          // Keep trying even after max retries
+          setLoadingMessage("Connection issues, still trying...");
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSandboxId(0);
+          }, RETRY_DELAY * 3);
+        }
       }
     };
 
     if (e2bApiKey && sandboxStatus === "ready") {
-      fetchSandboxId();
+      fetchSandboxId(0);
+    } else if (e2bApiKey && sandboxStatus !== "ready") {
+      setLoadingMessage("Waiting for sandbox to initialize...");
     }
+    
+    return () => {
+      isMounted = false;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
   }, [e2bApiKey, sandboxStatus]);
 
   // Connect to sandbox and initialize terminal
@@ -143,18 +202,40 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
     if (!sandboxId || !e2bApiKey || initializedRef.current) return;
     initializedRef.current = true;
 
-    const initTerminal = async () => {
+    const initTerminal = async (attempt: number = 0): Promise<void> => {
+      setLoadingMessage(attempt > 0 
+        ? `Initializing terminal... (attempt ${attempt + 1}/${MAX_RETRIES})`
+        : "Initializing terminal...");
+      
       try {
-        // Connect to sandbox
+        // Connect to sandbox with retry
+        console.log("[EmbeddedTerminal] Connecting to sandbox:", sandboxId);
         const sandbox = await Sandbox.connect(sandboxId, {
           apiKey: e2bApiKey,
         });
         sandboxRef.current = sandbox;
+        console.log("[EmbeddedTerminal] Sandbox connected successfully");
 
-        // Wait for container to be ready
+        // Wait for container to be ready with retry
         if (!terminalRef.current) {
-          setStatus("error");
-          return;
+          console.log("[EmbeddedTerminal] Terminal ref not ready, waiting...");
+          if (attempt < MAX_RETRIES - 1) {
+            setLoadingMessage("Waiting for terminal container...");
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (terminalRef.current) {
+              // Container is now ready, continue
+              console.log("[EmbeddedTerminal] Terminal ref now ready");
+            } else {
+              // Retry
+              retryTimeoutRef.current = setTimeout(() => initTerminal(attempt + 1), RETRY_DELAY);
+              return;
+            }
+          } else {
+            // Keep waiting
+            setLoadingMessage("Preparing terminal...");
+            retryTimeoutRef.current = setTimeout(() => initTerminal(0), RETRY_DELAY);
+            return;
+          }
         }
 
         // Create xterm instance
@@ -391,10 +472,31 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
         }, 300);
 
       } catch (error) {
-        console.error("Failed to initialize embedded terminal:", error);
-        setStatus("error");
+        console.error("Failed to initialize embedded terminal:", error, "Attempt:", attempt);
         
         const errorMessage = error instanceof Error ? error.message : "Failed to initialize terminal";
+        
+        // Retry logic - don't show error immediately
+        if (attempt < MAX_RETRIES - 1) {
+          console.log("[EmbeddedTerminal] Retrying terminal initialization...");
+          setLoadingMessage(`Terminal initialization failed, retrying... (${attempt + 1}/${MAX_RETRIES})`);
+          setRetryCount(attempt + 1);
+          initializedRef.current = false; // Allow retry
+          retryTimeoutRef.current = setTimeout(() => initTerminal(attempt + 1), RETRY_DELAY);
+          return;
+        }
+        
+        // After max retries, keep trying but show warning
+        if (attempt >= MAX_RETRIES - 1) {
+          console.log("[EmbeddedTerminal] Max retries reached, will keep trying...");
+          setLoadingMessage("Having trouble connecting... Still trying...");
+          initializedRef.current = false;
+          retryTimeoutRef.current = setTimeout(() => initTerminal(0), RETRY_DELAY * 2);
+          return;
+        }
+        
+        // Only set error status if we've exhausted all options (this won't trigger now)
+        setStatus("error");
         
         // POST error back to backend so LLM knows the command failed
         if (commandId && !outputSubmittedRef.current) {
@@ -423,7 +525,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
       }
     };
 
-    initTerminal();
+    initTerminal(0);
 
     return () => {
       // Cleanup
@@ -432,6 +534,12 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
       }
       if (sandboxRef.current && terminalPidRef.current) {
         sandboxRef.current.pty.kill(terminalPidRef.current).catch(console.error);
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      if (serverDetectionTimeoutRef.current) {
+        clearTimeout(serverDetectionTimeoutRef.current);
       }
     };
   }, [sandboxId, e2bApiKey, command, sessionName, entryId, commandId, updateChatEntry, onOutputCapture, isLongRunning, checkServerReadyFallback]);
@@ -470,11 +578,52 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
     );
   }
 
-  if (sandboxStatus !== "ready") {
+  if (sandboxStatus !== "ready" || !sandboxId) {
     return (
-      <div data-design-id={`embedded-terminal-no-sandbox-${entryId}`} className="rounded-lg bg-[#0d1117] border border-[#30363d] p-4 text-center">
-        <Loader2 className="w-8 h-8 text-gray-500 mx-auto mb-2 animate-spin" />
-        <p className="text-xs text-gray-500">Waiting for sandbox...</p>
+      <div data-design-id={`embedded-terminal-loading-${entryId}`} className="rounded-lg bg-[#0d1117] border border-[#30363d] overflow-hidden">
+        {/* Header - preloaded */}
+        <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />
+            <TerminalSquare className="w-4 h-4 text-gray-500" />
+            <span className="text-xs font-mono text-gray-500">{sessionName}</span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+            Initializing...
+          </span>
+        </div>
+        
+        {/* Command display - preloaded */}
+        <div className="px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] font-mono text-xs">
+          <span className="text-cyan-400">user@e2b</span>
+          <span className="text-gray-500">:</span>
+          <span className="text-blue-400">~</span>
+          <span className="text-gray-500">$ </span>
+          <span className="text-gray-100">{command}</span>
+        </div>
+        
+        {/* Loading content */}
+        <div className="p-8 flex flex-col items-center justify-center" style={{ minHeight: "200px" }}>
+          <div className="relative mb-4">
+            <div className="w-12 h-12 rounded-full border-2 border-[#30363d] border-t-green-400 animate-spin" />
+            <TerminalSquare className="w-5 h-5 text-green-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="text-sm text-gray-400 mb-1">{loadingMessage}</p>
+          {retryCount > 0 && (
+            <p className="text-xs text-gray-500">
+              Attempt {retryCount + 1} of {MAX_RETRIES}
+            </p>
+          )}
+          <div className="flex gap-1 mt-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-green-400/50 animate-pulse"
+                style={{ animationDelay: `${i * 0.2}s` }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -503,7 +652,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
             <Server className="w-4 h-4 text-cyan-400" />
           )}
           {status === "error" && (
-            <AlertCircle className="w-4 h-4 text-red-400" />
+            <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />
           )}
           <TerminalSquare className="w-4 h-4 text-green-400" />
           <span className="text-xs font-mono text-gray-400">{sessionName}</span>
@@ -525,18 +674,23 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
         </div>
         
         <div className="flex items-center gap-2">
+          {retryCount > 0 && status === "connecting" && (
+            <span className="text-[10px] text-gray-500 mr-1">
+              Retry {retryCount}/{MAX_RETRIES}
+            </span>
+          )}
           <span className={`text-[10px] px-2 py-0.5 rounded ${
             status === "connecting" ? "bg-yellow-500/20 text-yellow-400" :
             status === "running" ? "bg-green-500/20 text-green-400 animate-pulse" :
             status === "completed" ? "bg-green-500/20 text-green-400" :
             status === "server_running" ? "bg-cyan-500/20 text-cyan-400" :
-            "bg-red-500/20 text-red-400"
+            "bg-yellow-500/20 text-yellow-400"
           }`}>
             {status === "connecting" ? "Connecting..." :
              status === "running" ? "Running..." :
              status === "completed" ? "Completed" :
              status === "server_running" ? "Server Running" :
-             "Error"}
+             "Reconnecting..."}
           </span>
           
           <button
