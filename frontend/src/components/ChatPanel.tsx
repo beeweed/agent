@@ -62,6 +62,7 @@ export function ChatPanel() {
     setIsMemoryOpen,
     apiKey,
     e2bApiKey,
+    e2bTemplateId,
     sandboxStatus,
     setSandboxStatus,
     setCodeStreaming,
@@ -91,6 +92,12 @@ export function ChatPanel() {
     
     // Check for E2B API key
     if (!e2bApiKey) {
+      setIsSettingsOpen(true);
+      return;
+    }
+    
+    // Check for E2B Template ID
+    if (!e2bTemplateId) {
       setIsSettingsOpen(true);
       return;
     }
@@ -414,7 +421,7 @@ export function ChatPanel() {
     setCodeStreaming({ isStreaming: false });
   };
 
-  const canChat = apiKey && e2bApiKey;
+  const canChat = apiKey && e2bApiKey && e2bTemplateId;
 
   return (
     <div 
@@ -507,7 +514,7 @@ export function ChatPanel() {
           </div>
         )}
         
-        {/* Warning banner if API keys are missing */}
+        {/* Warning banner if API keys or template are missing */}
         {!canChat && (
           <div 
             data-design-id="api-key-warning"
@@ -520,7 +527,9 @@ export function ChatPanel() {
                 ? "Configure API keys in Settings to start chatting"
                 : !apiKey 
                   ? "OpenRouter API key required"
-                  : "E2B API key required for sandbox"
+                  : !e2bApiKey
+                    ? "E2B API key required for sandbox"
+                    : "Create a template to unlock 8GB RAM & 8 CPUs"
               }
             </span>
           </div>

@@ -57,13 +57,13 @@ export function SettingsDialog() {
     setIsSettingsOpen(false);
   };
 
-  const isConfigValid = localApiKey.trim() && localE2bApiKey.trim();
+  const isConfigValid = localApiKey.trim() && localE2bApiKey.trim() && localE2bTemplateId.trim();
 
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
       <DialogContent 
         data-design-id="settings-dialog"
-        className="w-[95vw] max-w-[95vw] xs:w-[90vw] xs:max-w-[90vw] sm:max-w-lg bg-card border-border p-4 xs:p-6 rounded-xl"
+        className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-lg bg-card border-border p-4 sm:p-6 rounded-xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -148,11 +148,11 @@ export function SettingsDialog() {
 
           {/* E2B Sandbox Template Section */}
           <div data-design-id="e2b-template-section" className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-purple-500" />
                 <label className="text-sm font-medium text-foreground">E2B Sandbox Template</label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Optional</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Required</span>
               </div>
               <Button
                 data-design-id="create-template-button"
@@ -175,11 +175,27 @@ export function SettingsDialog() {
                 className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
               />
             </div>
+            
+            {/* Template Benefits Info */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <svg className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <div className="text-xs text-purple-400">
+                <span className="font-semibold">Create a template to unlock:</span>
+                <ul className="mt-1 space-y-0.5 text-purple-400/90">
+                  <li>8 GB RAM for your sandbox</li>
+                  <li>8 CPU cores for faster execution</li>
+                  <li>1 hour timeout for long-running tasks</li>
+                </ul>
+              </div>
+            </div>
+            
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>If provided, all new sandboxes will be created using this E2B template.</span>
+              <span>A template is required to chat with the AI. Create one using the button above.</span>
             </div>
           </div>
 
@@ -191,6 +207,18 @@ export function SettingsDialog() {
               </svg>
               <p className="text-xs text-amber-500">
                 E2B API key is required to use the agent. Without it, you won't be able to create files or run code.
+              </p>
+            </div>
+          )}
+          
+          {/* Warning if Template is missing */}
+          {localE2bApiKey.trim() && !localE2bTemplateId.trim() && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <svg className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-xs text-purple-400">
+                <span className="font-semibold">Template required!</span> Create a template to chat with AI and get 8GB RAM + 8 CPU cores for your sandbox.
               </p>
             </div>
           )}

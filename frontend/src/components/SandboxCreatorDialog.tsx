@@ -126,7 +126,7 @@ export function SandboxCreatorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         data-design-id="sandbox-creator-dialog"
-        className="w-[95vw] max-w-[95vw] sm:max-w-lg bg-card border-border p-4 sm:p-6 rounded-xl max-h-[90vh] overflow-y-auto"
+        className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-lg bg-card border-border p-4 sm:p-6 rounded-xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
