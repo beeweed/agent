@@ -27,10 +27,10 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace(/\d+-/, "8080-");
+      return window.location.origin.replace(/\d+-/, "8000-");
     }
   }
-  return "http://localhost:8080";
+  return "http://localhost:8000";
 };
 
 const API_BASE = getApiBase();
