@@ -64,7 +64,8 @@ export interface ShellResult {
   session_name?: string;
   command?: string;
   error?: string;
-  urls?: string[];  // Extracted localhost URLs for dev servers
+  urls?: string[];  // Extracted HTTP/HTTPS URLs (localhost, IPs, domains, etc.)
+  hasPortConflict?: boolean;  // True if a real port conflict was detected
 }
 
 export interface AgentEvent {

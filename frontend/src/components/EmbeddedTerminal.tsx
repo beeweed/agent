@@ -3,7 +3,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Sandbox } from "e2b";
 import { useStore } from "@/store/useStore";
-import { isLongRunningCommand, detectServerStatus } from "@/lib/serverDetection";
+import { isLongRunningCommand, detectServerStatus, getDetectionSummary } from "@/lib/serverDetection";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -69,22 +69,58 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
     if (outputSubmittedRef.current || !isLongRunning) return;
     
     const serverStatus = detectServerStatus(command, outputBufferRef.current);
+    const detectionSummary = getDetectionSummary(command, outputBufferRef.current);
+    
     console.log("[SERVER_DETECTION_FALLBACK] Checking with accumulated output...", {
       outputLength: outputBufferRef.current.length,
       isReady: serverStatus.isReady,
-      urls: serverStatus.urls
+      hasPortConflict: serverStatus.hasPortConflict,
+      urls: serverStatus.urls,
+      detectionSummary
     });
     
+    // Check for port conflict first - don't mark as ready if there's a conflict
+    if (serverStatus.hasPortConflict && !outputSubmittedRef.current) {
+      console.log("[SERVER_DETECTION_FALLBACK] Port conflict detected!");
+      outputSubmittedRef.current = true;
+      setStatus("error");
+      
+      if (commandId) {
+        fetch(`${API_BASE}/api/shell/output`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            command_id: commandId,
+            output: serverStatus.message,
+            success: false,
+            error: "Port conflict detected. Please use a different port."
+          }),
+        }).catch(console.error);
+      }
+      
+      updateChatEntry(entryId, {
+        shellStatus: "error",
+        shellResult: {
+          success: false,
+          output: serverStatus.message,
+          error: "Port conflict detected",
+          session_name: sessionName,
+          command: command,
+        },
+      });
+      return;
+    }
+    
     if (serverStatus.isReady && !outputSubmittedRef.current) {
-      console.log("[SERVER_DETECTION_FALLBACK] Server detected! Submitting...");
+      console.log("[SERVER_DETECTION_FALLBACK] Server detected! Submitting full output with URLs...");
       outputSubmittedRef.current = true;
       setStatus("server_running");
       setServerUrls(serverStatus.urls);
       
       if (commandId) {
-        console.log("[SHELL_OUTPUT_FALLBACK] POSTing to backend:", {
+        console.log("[SHELL_OUTPUT_FALLBACK] POSTing to backend with full output:", {
           command_id: commandId,
-          output: serverStatus.message,
+          urlCount: serverStatus.urls.length,
           api_base: API_BASE
         });
         fetch(`${API_BASE}/api/shell/output`, {
@@ -92,7 +128,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             command_id: commandId,
-            output: serverStatus.message,
+            output: serverStatus.message,  // Now includes full output + URLs
             success: true,
             error: null
           }),
@@ -302,13 +338,53 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
               // Check for long-running server commands first
               if (isLongRunningCommand(command)) {
                 const serverStatus = detectServerStatus(command, outputBufferRef.current);
+                const detectionSummary = getDetectionSummary(command, outputBufferRef.current);
                 
                 // Debug logging for server detection
                 console.log("[SERVER_DETECTION] Checking output for server ready state...");
-                console.log("[SERVER_DETECTION] isReady:", serverStatus.isReady, "urls:", serverStatus.urls);
+                console.log("[SERVER_DETECTION] isReady:", serverStatus.isReady, 
+                  "hasPortConflict:", serverStatus.hasPortConflict,
+                  "urls:", serverStatus.urls);
+                console.log("[SERVER_DETECTION] Summary:", detectionSummary);
+                
+                // Check for port conflict FIRST - this takes priority
+                if (serverStatus.hasPortConflict && !outputSubmittedRef.current) {
+                  console.log("[SERVER_DETECTION] Port conflict detected! Notifying LLM...");
+                  outputSubmittedRef.current = true;
+                  
+                  setStatus("error");
+                  
+                  // POST port conflict back to backend so LLM can retry with different port
+                  if (commandId) {
+                    console.log("[SHELL_OUTPUT] POSTing port conflict to backend");
+                    fetch(`${API_BASE}/api/shell/output`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        command_id: commandId,
+                        output: serverStatus.message,
+                        success: false,
+                        error: "Port conflict detected. The port is already in use. Please try a different port."
+                      }),
+                    }).catch(console.error);
+                  }
+                  
+                  updateChatEntry(entryId, {
+                    shellStatus: "error",
+                    shellResult: {
+                      success: false,
+                      output: serverStatus.message,
+                      error: "Port conflict detected",
+                      session_name: sessionName,
+                      command: command,
+                    },
+                  });
+                  
+                  return; // Don't continue checking
+                }
                 
                 if (serverStatus.isReady && !outputSubmittedRef.current) {
-                  console.log("[SERVER_DETECTION] Server detected as ready! Submitting output...");
+                  console.log("[SERVER_DETECTION] Server detected as ready! Submitting full output with URLs...");
                   // Server is ready - submit output and stop loading
                   outputSubmittedRef.current = true;
                   
@@ -317,11 +393,11 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
                   
                   const capturedOutput = outputBufferRef.current;
                   
-                  // CRITICAL: POST output back to backend for LLM with server ready message
+                  // CRITICAL: POST output back to backend for LLM with FULL output + URLs
                   if (commandId) {
                     console.log("[SHELL_OUTPUT] POSTing server ready output to backend:", {
                       command_id: commandId,
-                      output: serverStatus.message,
+                      urlCount: serverStatus.urls.length,
                       api_base: API_BASE
                     });
                     fetch(`${API_BASE}/api/shell/output`, {
@@ -329,7 +405,7 @@ export function EmbeddedTerminal({ command, sessionName = "main", entryId, comma
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         command_id: commandId,
-                        output: serverStatus.message,
+                        output: serverStatus.message,  // Now includes full output + all URLs
                         success: true,
                         error: null
                       }),
