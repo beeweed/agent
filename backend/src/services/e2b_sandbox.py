@@ -395,6 +395,7 @@ class E2BSandboxManager:
             return {
                 "success": True,
                 "content": formatted_content,
+                "raw_content": content,  # Include raw content without line numbers for replace_in_file
                 "file_path": file_path,
                 "file_name": file_path.split('/')[-1],
                 "total_lines": len(lines),

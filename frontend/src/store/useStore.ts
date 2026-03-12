@@ -8,6 +8,10 @@ export interface CodeStreamingState {
   isStreaming: boolean;
   tool: string;
   action: string;
+  // Diff view state for replace_in_file tool
+  isDiffView: boolean;
+  oldString: string;
+  newString: string;
 }
 
 export interface TerminalBufferData {
@@ -111,6 +115,9 @@ const initialCodeStreamingState: CodeStreamingState = {
   isStreaming: false,
   tool: "",
   action: "",
+  isDiffView: false,
+  oldString: "",
+  newString: "",
 };
 
 export const useStore = create<AppState>()(

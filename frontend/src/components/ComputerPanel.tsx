@@ -1,8 +1,61 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
+
+// Diff view component for replace_in_file tool
+function DiffView({ filePath, oldString, newString }: { filePath: string; oldString: string; newString: string }) {
+  // Get file content context for the diff
+  const oldLines = oldString.split('\n');
+  const newLines = newString.split('\n');
+  
+  return (
+    <div className="font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
+      {/* File path header */}
+      <div className="px-3 py-2 bg-zinc-200 border-b border-zinc-300 text-zinc-600 font-medium">
+        {filePath}
+      </div>
+      
+      {/* Diff content */}
+      <div className="divide-y divide-zinc-200">
+        {/* Removed lines (old_string) */}
+        <div className="bg-red-50">
+          <div className="px-2 py-1 text-[9px] xs:text-[10px] text-red-600 font-medium uppercase tracking-wide border-b border-red-100">
+            Removed
+          </div>
+          {oldLines.map((line, index) => (
+            <div key={`old-${index}`} className="flex group hover:bg-red-100/50">
+              <span className="select-none w-8 sm:w-10 text-right pr-3 text-red-300 flex-shrink-0 bg-red-100/30">
+                -
+              </span>
+              <span className="flex-1 text-red-700 bg-red-50 px-2 whitespace-pre-wrap break-all">
+                {line || '\u00A0'}
+              </span>
+            </div>
+          ))}
+        </div>
+        
+        {/* Added lines (new_string) */}
+        <div className="bg-green-50">
+          <div className="px-2 py-1 text-[9px] xs:text-[10px] text-green-600 font-medium uppercase tracking-wide border-b border-green-100">
+            Added
+          </div>
+          {newLines.map((line, index) => (
+            <div key={`new-${index}`} className="flex group hover:bg-green-100/50">
+              <span className="select-none w-8 sm:w-10 text-right pr-3 text-green-300 flex-shrink-0 bg-green-100/30">
+                +
+              </span>
+              <span className="flex-1 text-green-700 bg-green-50 px-2 whitespace-pre-wrap break-all">
+                {line || '\u00A0'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ComputerPanel() {
   const { codeStreaming, isAgentRunning } = useStore();
@@ -96,7 +149,9 @@ export function ComputerPanel() {
         
         <div data-design-id="computer-status" className="flex items-center gap-1.5 xs:gap-2 sm:gap-3">
           <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 bg-secondary">
-            {codeStreaming.tool === "Reader" ? (
+            {codeStreaming.isDiffView ? (
+              <Replace className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+            ) : codeStreaming.tool === "Reader" ? (
               <BookOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : codeStreaming.isStreaming ? (
               <Code className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -108,7 +163,13 @@ export function ComputerPanel() {
             <span className="text-[10px] xs:text-[11px] sm:text-xs text-muted-foreground">
               Using <span className="text-foreground/80">{codeStreaming.tool || "Editor"}</span>
             </span>
-            {codeStreaming.isStreaming && codeStreaming.filePath && (
+            {codeStreaming.isDiffView && codeStreaming.filePath && (
+              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-amber-500/10 text-amber-600 border-amber-500/30">
+                <Replace className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                <span className="truncate">Updating {codeStreaming.filePath}</span>
+              </div>
+            )}
+            {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && (
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-accent text-muted-foreground border-border/50">
                 {codeStreaming.tool === "Reader" ? (
                   <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
@@ -118,13 +179,13 @@ export function ComputerPanel() {
                 <span className="truncate">{codeStreaming.tool === "Reader" ? "Reading" : "Editing"} {codeStreaming.filePath}</span>
               </div>
             )}
-            {!codeStreaming.isStreaming && codeStreaming.content && codeStreaming.tool === "Reader" && (
+            {!codeStreaming.isStreaming && !codeStreaming.isDiffView && codeStreaming.content && codeStreaming.tool === "Reader" && (
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent rounded-full text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground border border-border/50 max-w-full">
                 <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
                 <span className="truncate">Read {codeStreaming.filePath}</span>
               </div>
             )}
-            {!codeStreaming.isStreaming && !codeStreaming.content && (
+            {!codeStreaming.isStreaming && !codeStreaming.content && !codeStreaming.isDiffView && (
               <span className="text-[10px] xs:text-[11px] sm:text-xs text-muted-foreground">Waiting for agent...</span>
             )}
           </div>
@@ -144,7 +205,14 @@ export function ComputerPanel() {
             ref={codeContainerRef}
             className="flex-1 overflow-auto bg-[#f5f5f5] p-1.5 xs:p-2 sm:p-3"
           >
-            {codeStreaming.content && highlightedCode ? (
+            {/* Diff view for replace_in_file tool */}
+            {codeStreaming.isDiffView && codeStreaming.oldString && codeStreaming.newString ? (
+              <DiffView 
+                filePath={codeStreaming.filePath}
+                oldString={codeStreaming.oldString}
+                newString={codeStreaming.newString}
+              />
+            ) : codeStreaming.content && highlightedCode ? (
               <pre className="m-0 font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
                 <code className="hljs">
                   {renderCodeWithLineNumbers(highlightedCode)}

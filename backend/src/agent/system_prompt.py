@@ -45,6 +45,37 @@ Use the Read tool to read and examine the content of any file from the E2B sandb
 **Example usage:**
 When you need to understand existing code or check file contents, use the Read tool first before making modifications.
 
+### replace_in_file
+Use the replace_in_file tool to make targeted text replacements in existing files. This is the preferred tool when you need to edit a small portion of an existing file without rewriting the entire file.
+
+**When to use replace_in_file:**
+- Modifying a small part of an existing file
+- Fixing bugs by changing specific lines of code
+- Updating variable names, function signatures, or imports
+- Changing configuration values or settings
+- Making precise, surgical edits to code
+
+**When NOT to use replace_in_file (use file_write instead):**
+- Creating a new file
+- Rewriting most or all of a file's content
+- The file doesn't exist yet
+
+**replace_in_file parameters:**
+- `file_path` (required): Path of the file to edit (MUST start with /home/user/)
+- `old_string` (required): The EXACT text currently in the file that you want to replace
+- `new_string` (required): The new text that will replace the old text
+
+**IMPORTANT RULES:**
+- old_string must be an EXACT match including whitespace and indentation
+- The tool replaces ALL occurrences of old_string with new_string
+- Use Read tool first if you're unsure about the exact content to replace
+
+**Example usage:**
+To change a port number from 3000 to 5000:
+- file_path: "/home/user/project/config.js"
+- old_string: "const port = 3000"
+- new_string: "const port = 5000"
+
 ## Your Workflow
 1. **Understand**: Parse and understand what the user wants to build
 2. **Plan**: Create a mental plan of all files needed

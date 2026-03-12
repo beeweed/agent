@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -119,6 +119,7 @@ export function ChatPanel() {
     let currentThoughtId: string | null = null;
     let currentReadFileCardId: string | null = null;
     let currentShellCardId: string | null = null;
+    let currentReplaceInFileCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -338,6 +339,65 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+          
+          case "replace_in_file_start":
+            {
+              const filePath = event.file_path || "";
+              const oldString = event.old_string || "";
+              const newString = event.new_string || "";
+              console.log("[REPLACE_IN_FILE_START]", filePath);
+              
+              // Show diff view in computer panel
+              setCodeStreaming({
+                filePath,
+                content: "",
+                isStreaming: true,
+                tool: "Replace",
+                action: `Updating ${filePath}`,
+                isDiffView: true,
+                oldString,
+                newString,
+              });
+              
+              // Create replace in file card entry
+              const replaceEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "replace_in_file_card",
+                filePath,
+                fileStatus: "replacing",
+                oldString,
+                newString,
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentReplaceInFileCardId = replaceEntry.id;
+              addChatEntry(replaceEntry);
+            }
+            break;
+          
+          case "replace_in_file_end":
+            {
+              const result = event.result as ReplaceInFileResult;
+              console.log("[REPLACE_IN_FILE_END]", event.file_path, result?.success);
+              
+              // Update the replace in file card with result
+              if (currentReplaceInFileCardId) {
+                updateChatEntry(currentReplaceInFileCardId, {
+                  fileStatus: result?.success ? "replaced" : "error",
+                  replaceResult: result,
+                });
+                currentReplaceInFileCardId = null;
+              }
+              
+              // Keep showing the diff view but mark streaming as complete
+              setCodeStreaming({ 
+                isStreaming: false,
+              });
+              
+              // Refresh file tree after replacement
+              fetchFileTree();
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
@@ -352,13 +412,17 @@ export function ChatPanel() {
               updateChatEntry(currentShellCardId, { shellStatus: "error" });
               currentShellCardId = null;
             }
-            setCodeStreaming({ isStreaming: false });
+            if (currentReplaceInFileCardId) {
+              updateChatEntry(currentReplaceInFileCardId, { fileStatus: "error" });
+              currentReplaceInFileCardId = null;
+            }
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "complete":
             fetchMemory();
             fetchFileTree();  // Refresh file tree after completion
-            setCodeStreaming({ isStreaming: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "max_iterations_reached":
@@ -368,7 +432,7 @@ export function ChatPanel() {
               content: `Maximum iterations (${event.max_iterations}) reached. The agent has stopped.`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "error":
@@ -378,12 +442,12 @@ export function ChatPanel() {
               content: `Error: ${event.error}`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "stream_end":
             setIsAgentRunning(false);
-            setCodeStreaming({ isStreaming: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
         }
       });

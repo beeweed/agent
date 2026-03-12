@@ -68,6 +68,16 @@ export interface ShellResult {
   hasPortConflict?: boolean;  // True if a real port conflict was detected
 }
 
+export interface ReplaceInFileResult {
+  success: boolean;
+  message?: string;
+  file_path?: string;
+  old_string?: string;
+  new_string?: string;
+  occurrences?: number;
+  error?: string;
+}
+
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -92,7 +102,9 @@ export interface AgentEvent {
     | "sandbox_ready"
     | "sandbox_error"
     | "shell_exec_start"
-    | "shell_exec_end";
+    | "shell_exec_end"
+    | "replace_in_file_start"
+    | "replace_in_file_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -100,7 +112,7 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ShellResult;
+  result?: ToolResult | ReadFileResult | ShellResult | ReplaceInFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -108,6 +120,8 @@ export interface AgentEvent {
   session_name?: string;
   command?: string;
   command_id?: string;  // Used to coordinate shell output between frontend and backend
+  old_string?: string;  // For replace_in_file tool
+  new_string?: string;  // For replace_in_file tool
 }
 
 export interface Model {
@@ -143,16 +157,17 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card" | "replace_in_file_card";
   content?: string;
   filePath?: string;
-  fileStatus?: "writing" | "created" | "error" | "reading" | "read";
+  fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced";
   iteration?: number;
   toolName?: string;
   arguments?: Record<string, unknown>;
   result?: ToolResult;
   readResult?: ReadFileResult;
   shellResult?: ShellResult;
+  replaceResult?: ReplaceInFileResult;
   shellCommand?: string;
   shellSessionName?: string;
   shellStatus?: "running" | "completed" | "error" | "server_running";
@@ -160,4 +175,6 @@ export interface ChatEntry {
   timestamp: Date;
   isStreaming?: boolean;
   sandboxStatus?: "creating" | "ready" | "error";
+  oldString?: string;  // For replace_in_file tool
+  newString?: string;  // For replace_in_file tool
 }
