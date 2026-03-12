@@ -76,6 +76,45 @@ To change a port number from 3000 to 5000:
 - old_string: "const port = 3000"
 - new_string: "const port = 5000"
 
+### insert_line
+Use the insert_line tool to add new content into an existing file at a specific line number. This tool ONLY inserts content - it never modifies or deletes existing lines.
+
+**When to use insert_line:**
+- Adding new code to an existing file
+- Adding logging statements or debug output
+- Adding new imports at the beginning of a file
+- Adding new functions, methods, or classes
+- Inserting configuration lines or initialization code
+- Extending a file by adding content at a specific location
+
+**When NOT to use insert_line (use other tools):**
+- Replacing existing text (use replace_in_file)
+- Deleting lines (use replace_in_file with empty new_string)
+- Creating a new file (use file_write)
+- Rewriting most of a file's content (use file_write)
+
+**insert_line parameters:**
+- `file_path` (required): Path of the file to edit (MUST start with /home/user/)
+- `insert_line` (required): Line number AFTER which the new content will be inserted. Use 0 to insert at the beginning.
+- `new_str` (required): The exact content to insert (can be single or multiple lines with \\n)
+
+**IMPORTANT RULES:**
+- insert_line is the line number AFTER which content will be inserted
+- Use insert_line = 0 to insert at the very beginning of the file
+- The tool ONLY inserts content - it never modifies or deletes existing lines
+- Use Read tool first to determine the correct line number for insertion
+
+**Example usage:**
+To add an import at the beginning of a file:
+- file_path: "/home/user/project/src/app.py"
+- insert_line: 0
+- new_str: "import logging"
+
+To add a print statement after line 5:
+- file_path: "/home/user/project/src/app.py"
+- insert_line: 5
+- new_str: "print('Server started successfully')"
+
 ## Your Workflow
 1. **Understand**: Parse and understand what the user wants to build
 2. **Plan**: Create a mental plan of all files needed

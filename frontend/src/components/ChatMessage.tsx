@@ -1,6 +1,6 @@
 import type { ChatEntry } from "@/types";
 import { useStore } from "@/store/useStore";
-import { Code, Eye, Check, Loader2, AlertCircle, BookOpen, Replace } from "lucide-react";
+import { Code, Eye, Check, Loader2, AlertCircle, BookOpen, Replace, Plus } from "lucide-react";
 import { MessageContent } from "./MessageContent";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
 
@@ -233,6 +233,60 @@ export function ChatMessage({ entry }: ChatMessageProps) {
           )}
           
           {isReplaced && (
+            <button 
+              className="flex items-center gap-1 px-1 xs:px-1.5 py-0.5 rounded text-[10px] xs:text-xs text-muted-foreground hover:text-foreground hover:bg-card active:bg-card transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (entry.filePath) handleFileClick(entry.filePath);
+              }}
+            >
+              <Eye className="w-2.5 h-2.5 xs:w-3 xs:h-3" />
+              <span className="hidden xs:inline">View</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (entry.type === "insert_line_card") {
+    const isInserting = entry.fileStatus === "inserting";
+    const isInserted = entry.fileStatus === "inserted";
+    const isError = entry.fileStatus === "error";
+
+    return (
+      <div data-design-id={`insert-line-card-${entry.id}`} className="animate-fade-in pl-6 xs:pl-8 sm:pl-10">
+        <div
+          onClick={() => isInserted && entry.filePath && handleFileClick(entry.filePath)}
+          className={`inline-flex flex-wrap items-center gap-1.5 xs:gap-2 px-2 xs:px-3 py-1 xs:py-1.5 rounded-full bg-accent border border-border text-[11px] xs:text-sm cursor-pointer transition-all hover:bg-secondary active:bg-secondary ${
+            isInserting ? "animate-pulse" : ""
+          }`}
+        >
+          <div className="flex items-center gap-1.5 xs:gap-2">
+            {isInserting && (
+              <Loader2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground animate-spin" />
+            )}
+            {isInserted && (
+              <Check className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-green-600" />
+            )}
+            {isError && (
+              <AlertCircle className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-destructive" />
+            )}
+            <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground" />
+          </div>
+          
+          <div className="flex items-center gap-1 xs:gap-2 min-w-0">
+            <span className="text-foreground flex-shrink-0">Insert</span>
+            <span className="font-mono text-muted-foreground truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none">{entry.filePath}</span>
+          </div>
+          
+          {isInserted && entry.insertResult && (
+            <span className="text-[10px] xs:text-xs text-muted-foreground">
+              {entry.insertResult.lines_inserted} line(s) at {entry.insertLine}
+            </span>
+          )}
+          
+          {isInserted && (
             <button 
               className="flex items-center gap-1 px-1 xs:px-1.5 py-0.5 rounded text-[10px] xs:text-xs text-muted-foreground hover:text-foreground hover:bg-card active:bg-card transition-colors"
               onClick={(e) => {

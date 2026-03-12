@@ -12,6 +12,10 @@ export interface CodeStreamingState {
   isDiffView: boolean;
   oldString: string;
   newString: string;
+  // Insert view state for insert_line tool
+  isInsertView: boolean;
+  insertLine: number;
+  newStr: string;
 }
 
 export interface TerminalBufferData {
@@ -118,6 +122,9 @@ const initialCodeStreamingState: CodeStreamingState = {
   isDiffView: false,
   oldString: "",
   newString: "",
+  isInsertView: false,
+  insertLine: 0,
+  newStr: "",
 };
 
 export const useStore = create<AppState>()(

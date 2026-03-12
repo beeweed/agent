@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -120,6 +120,7 @@ export function ChatPanel() {
     let currentReadFileCardId: string | null = null;
     let currentShellCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
+    let currentInsertLineCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -398,6 +399,65 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+          
+          case "insert_line_start":
+            {
+              const filePath = event.file_path || "";
+              const insertLine = event.insert_line || 0;
+              const newStr = event.new_str || "";
+              console.log("[INSERT_LINE_START]", filePath, "at line", insertLine);
+              
+              // Show insert view in computer panel
+              setCodeStreaming({
+                filePath,
+                content: "",
+                isStreaming: true,
+                tool: "Insert",
+                action: `Inserting into ${filePath}`,
+                isInsertView: true,
+                insertLine,
+                newStr,
+              });
+              
+              // Create insert line card entry
+              const insertEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "insert_line_card",
+                filePath,
+                fileStatus: "inserting",
+                insertLine,
+                newStr,
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentInsertLineCardId = insertEntry.id;
+              addChatEntry(insertEntry);
+            }
+            break;
+          
+          case "insert_line_end":
+            {
+              const result = event.result as InsertLineResult;
+              console.log("[INSERT_LINE_END]", event.file_path, result?.success);
+              
+              // Update the insert line card with result
+              if (currentInsertLineCardId) {
+                updateChatEntry(currentInsertLineCardId, {
+                  fileStatus: result?.success ? "inserted" : "error",
+                  insertResult: result,
+                });
+                currentInsertLineCardId = null;
+              }
+              
+              // Keep showing the insert view but mark streaming as complete
+              setCodeStreaming({ 
+                isStreaming: false,
+              });
+              
+              // Refresh file tree after insertion
+              fetchFileTree();
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
@@ -416,13 +476,17 @@ export function ChatPanel() {
               updateChatEntry(currentReplaceInFileCardId, { fileStatus: "error" });
               currentReplaceInFileCardId = null;
             }
-            setCodeStreaming({ isStreaming: false, isDiffView: false });
+            if (currentInsertLineCardId) {
+              updateChatEntry(currentInsertLineCardId, { fileStatus: "error" });
+              currentInsertLineCardId = null;
+            }
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
             break;
             
           case "complete":
             fetchMemory();
             fetchFileTree();  // Refresh file tree after completion
-            setCodeStreaming({ isStreaming: false, isDiffView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
             break;
             
           case "max_iterations_reached":
@@ -432,7 +496,7 @@ export function ChatPanel() {
               content: `Maximum iterations (${event.max_iterations}) reached. The agent has stopped.`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
             break;
             
           case "error":
@@ -442,12 +506,12 @@ export function ChatPanel() {
               content: `Error: ${event.error}`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
             break;
             
           case "stream_end":
             setIsAgentRunning(false);
-            setCodeStreaming({ isStreaming: false, isDiffView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
             break;
         }
       });

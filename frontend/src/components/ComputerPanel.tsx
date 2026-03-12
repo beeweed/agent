@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -52,6 +52,45 @@ function DiffView({ filePath, oldString, newString }: { filePath: string; oldStr
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Insert view component for insert_line tool
+function InsertView({ filePath, insertLine, newStr }: { filePath: string; insertLine: number; newStr: string }) {
+  const newLines = newStr.split('\n');
+  
+  return (
+    <div className="font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
+      {/* File path header */}
+      <div className="px-3 py-2 bg-zinc-200 border-b border-zinc-300 text-zinc-600 font-medium">
+        {filePath}
+      </div>
+      
+      {/* Insert info */}
+      <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-blue-600 text-[10px] xs:text-[11px]">
+        Inserting after line {insertLine}
+      </div>
+      
+      {/* Inserted lines (new_str) - all highlighted in green */}
+      <div className="bg-green-50">
+        <div className="px-2 py-1 text-[9px] xs:text-[10px] text-green-600 font-medium uppercase tracking-wide border-b border-green-100">
+          Inserted Lines
+        </div>
+        {newLines.map((line, index) => (
+          <div key={`insert-${index}`} className="flex group hover:bg-green-100/50">
+            <span className="select-none w-8 sm:w-10 text-right pr-3 text-green-400 flex-shrink-0 bg-green-100/30">
+              {insertLine + index + 1}
+            </span>
+            <span className="select-none w-6 sm:w-8 text-center text-green-500 flex-shrink-0 bg-green-100/50">
+              +
+            </span>
+            <span className="flex-1 text-green-700 bg-green-50 px-2 whitespace-pre-wrap break-all">
+              {line || '\u00A0'}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -151,6 +190,8 @@ export function ComputerPanel() {
           <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 bg-secondary">
             {codeStreaming.isDiffView ? (
               <Replace className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+            ) : codeStreaming.isInsertView ? (
+              <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : codeStreaming.tool === "Reader" ? (
               <BookOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : codeStreaming.isStreaming ? (
@@ -167,6 +208,12 @@ export function ComputerPanel() {
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-amber-500/10 text-amber-600 border-amber-500/30">
                 <Replace className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
                 <span className="truncate">Updating {codeStreaming.filePath}</span>
+              </div>
+            )}
+            {codeStreaming.isInsertView && codeStreaming.filePath && (
+              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-green-500/10 text-green-600 border-green-500/30">
+                <Plus className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                <span className="truncate">Inserting into {codeStreaming.filePath}</span>
               </div>
             )}
             {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && (
@@ -211,6 +258,12 @@ export function ComputerPanel() {
                 filePath={codeStreaming.filePath}
                 oldString={codeStreaming.oldString}
                 newString={codeStreaming.newString}
+              />
+            ) : codeStreaming.isInsertView && codeStreaming.newStr ? (
+              <InsertView 
+                filePath={codeStreaming.filePath}
+                insertLine={codeStreaming.insertLine}
+                newStr={codeStreaming.newStr}
               />
             ) : codeStreaming.content && highlightedCode ? (
               <pre className="m-0 font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
