@@ -10,6 +10,7 @@ from ..services.e2b_sandbox import sandbox_manager
 from ..tools.shell import SHELL_TOOL_DEFINITION
 from ..tools.replace_in_file import REPLACE_IN_FILE_TOOL_DEFINITION, replace_in_file
 from ..tools.insert_line import INSERT_LINE_TOOL_DEFINITION, insert_line
+from ..tools.delete_lines import DELETE_LINES_TOOL_DEFINITION, delete_lines_from_file
 
 
 # Global storage for pending shell command outputs
@@ -316,14 +317,15 @@ class ReActAgent:
         self.session_id = session_id  # Use provided session ID for sandbox consistency
         self.sandbox_ready = False
         
-        self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION, SHELL_TOOL_DEFINITION, REPLACE_IN_FILE_TOOL_DEFINITION, INSERT_LINE_TOOL_DEFINITION]
+        self.tools = [FILE_WRITE_TOOL_DEFINITION, FILE_READ_TOOL_DEFINITION, SHELL_TOOL_DEFINITION, REPLACE_IN_FILE_TOOL_DEFINITION, INSERT_LINE_TOOL_DEFINITION, DELETE_LINES_TOOL_DEFINITION]
         
         self.tool_executors = {
             "file_write": self._execute_file_write,
             "Read": self._execute_file_read,
             "shell": self._execute_shell,
             "replace_in_file": self._execute_replace_in_file,
-            "insert_line": self._execute_insert_line
+            "insert_line": self._execute_insert_line,
+            "delete_lines_from_file": self._execute_delete_lines
         }
         
         # Shell execution state for streaming output
@@ -521,6 +523,77 @@ class ReActAgent:
             "insert_line": insert_line_num,
             "new_str": new_str,
             "lines_inserted": insert_result.get("lines_inserted", 1)
+        }
+    
+    async def _execute_delete_lines(self, arguments: dict) -> dict:
+        """Execute the delete_lines_from_file tool using E2B sandbox."""
+        file_path = arguments.get("path", "")
+        target_line = arguments.get("target_line", None)
+        
+        # Ensure path starts with /home/user/
+        if not file_path.startswith("/home/user/"):
+            file_path = f"/home/user/{file_path.lstrip('/')}"
+        
+        # First, read the current file content
+        read_result = await sandbox_manager.read_file(
+            self.session_id,
+            file_path
+        )
+        
+        if not read_result.get("success"):
+            return {
+                "success": False,
+                "error": f"Could not read file {file_path}: {read_result.get('error', 'Unknown error')}",
+                "file_path": file_path
+            }
+        
+        # Get the raw content (without line numbers)
+        raw_content = read_result.get("raw_content", "")
+        if not raw_content:
+            content = read_result.get("content", "")
+            if content:
+                lines = content.split('\n')
+                raw_lines = []
+                for line in lines:
+                    if '\t' in line:
+                        raw_lines.append(line.split('\t', 1)[1] if '\t' in line else line)
+                    else:
+                        raw_lines.append(line)
+                raw_content = '\n'.join(raw_lines)
+        
+        # Perform the deletion using the tool function
+        delete_result = delete_lines_from_file(
+            file_path=file_path,
+            target_line=target_line,
+            content=raw_content
+        )
+        
+        if not delete_result.get("success"):
+            return delete_result
+        
+        # Write the modified content back to the file
+        new_content = delete_result.get("new_content", "")
+        write_result = await sandbox_manager.write_file(
+            self.session_id,
+            file_path,
+            new_content
+        )
+        
+        if not write_result.get("success"):
+            return {
+                "success": False,
+                "error": f"Could not write file {file_path}: {write_result.get('error', 'Unknown error')}",
+                "file_path": file_path
+            }
+        
+        return {
+            "success": True,
+            "message": delete_result.get("message", f"Successfully deleted lines from {file_path}"),
+            "file_path": file_path,
+            "deleted_lines": delete_result.get("deleted_lines", ""),
+            "start_line": delete_result.get("start_line", 0),
+            "end_line": delete_result.get("end_line", 0),
+            "lines_deleted": delete_result.get("lines_deleted", 0)
         }
     
     async def _execute_shell(self, arguments: dict, command_id: str = None) -> dict:
@@ -882,6 +955,19 @@ class ReActAgent:
                                     "iteration": self.current_iteration
                                 }
                             
+                            # Emit delete_lines_start event before executing delete_lines_from_file tool
+                            if tool_name == "delete_lines_from_file":
+                                file_path = arguments.get("path", "")
+                                target_line = arguments.get("target_line", 0)
+                                yield {
+                                    "type": "delete_lines_start",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "file_path": file_path,
+                                    "target_line": target_line,
+                                    "iteration": self.current_iteration
+                                }
+                            
                             # Emit shell_exec_start event before executing shell tool
                             # Generate unique command_id for frontend-backend coordination
                             shell_command_id = None
@@ -953,6 +1039,18 @@ class ReActAgent:
                                     "file_path": arguments.get("file_path", ""),
                                     "insert_line": arguments.get("insert_line", 0),
                                     "new_str": arguments.get("new_str", ""),
+                                    "result": result,
+                                    "iteration": self.current_iteration
+                                }
+                            
+                            # Emit delete_lines_end event after executing delete_lines_from_file tool
+                            if tool_name == "delete_lines_from_file":
+                                yield {
+                                    "type": "delete_lines_end",
+                                    "tool_id": tool_id,
+                                    "tool_name": tool_name,
+                                    "file_path": arguments.get("path", ""),
+                                    "target_line": arguments.get("target_line", 0),
                                     "result": result,
                                     "iteration": self.current_iteration
                                 }

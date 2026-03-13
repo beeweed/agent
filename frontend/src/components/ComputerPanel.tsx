@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2 } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -87,6 +87,45 @@ function InsertView({ filePath, insertLine, newStr }: { filePath: string; insert
               +
             </span>
             <span className="flex-1 text-green-700 bg-green-50 px-2 whitespace-pre-wrap break-all">
+              {line || '\u00A0'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Delete view component for delete_lines_from_file tool
+function DeleteView({ filePath, deletedLines, startLine, endLine }: { filePath: string; deletedLines: string; startLine: number; endLine: number }) {
+  const lines = deletedLines.split('\n');
+  
+  return (
+    <div className="font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
+      {/* File path header */}
+      <div className="px-3 py-2 bg-zinc-200 border-b border-zinc-300 text-zinc-600 font-medium">
+        {filePath}
+      </div>
+      
+      {/* Delete info */}
+      <div className="px-3 py-2 bg-red-50 border-b border-red-200 text-red-600 text-[10px] xs:text-[11px]">
+        Deleting line{startLine !== endLine ? `s ${startLine}-${endLine}` : ` ${startLine}`}
+      </div>
+      
+      {/* Deleted lines - all highlighted in red */}
+      <div className="bg-red-50">
+        <div className="px-2 py-1 text-[9px] xs:text-[10px] text-red-600 font-medium uppercase tracking-wide border-b border-red-100">
+          Deleted Lines
+        </div>
+        {lines.map((line, index) => (
+          <div key={`delete-${index}`} className="flex group hover:bg-red-100/50">
+            <span className="select-none w-8 sm:w-10 text-right pr-3 text-red-400 flex-shrink-0 bg-red-100/30">
+              {startLine + index}
+            </span>
+            <span className="select-none w-6 sm:w-8 text-center text-red-500 flex-shrink-0 bg-red-100/50">
+              -
+            </span>
+            <span className="flex-1 text-red-700 bg-red-50 px-2 whitespace-pre-wrap break-all">
               {line || '\u00A0'}
             </span>
           </div>
@@ -188,7 +227,9 @@ export function ComputerPanel() {
         
         <div data-design-id="computer-status" className="flex items-center gap-1.5 xs:gap-2 sm:gap-3">
           <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 bg-secondary">
-            {codeStreaming.isDiffView ? (
+            {codeStreaming.isDeleteView ? (
+              <Trash2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+            ) : codeStreaming.isDiffView ? (
               <Replace className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : codeStreaming.isInsertView ? (
               <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -216,7 +257,13 @@ export function ComputerPanel() {
                 <span className="truncate">Inserting into {codeStreaming.filePath}</span>
               </div>
             )}
-            {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && (
+            {codeStreaming.isDeleteView && codeStreaming.filePath && (
+              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-red-500/10 text-red-600 border-red-500/30">
+                <Trash2 className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                <span className="truncate">Deleting from {codeStreaming.filePath}</span>
+              </div>
+            )}
+            {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && !codeStreaming.isDeleteView && (
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-accent text-muted-foreground border-border/50">
                 {codeStreaming.tool === "Reader" ? (
                   <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
@@ -264,6 +311,13 @@ export function ComputerPanel() {
                 filePath={codeStreaming.filePath}
                 insertLine={codeStreaming.insertLine}
                 newStr={codeStreaming.newStr}
+              />
+            ) : codeStreaming.isDeleteView && codeStreaming.deletedLines ? (
+              <DeleteView 
+                filePath={codeStreaming.filePath}
+                deletedLines={codeStreaming.deletedLines}
+                startLine={codeStreaming.startLine}
+                endLine={codeStreaming.endLine}
               />
             ) : codeStreaming.content && highlightedCode ? (
               <pre className="m-0 font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">

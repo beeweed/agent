@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -121,6 +121,7 @@ export function ChatPanel() {
     let currentShellCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
     let currentInsertLineCardId: string | null = null;
+    let currentDeleteLinesCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -458,6 +459,74 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+          
+          case "delete_lines_start":
+            {
+              const filePath = event.file_path || "";
+              const targetLine = event.target_line;
+              console.log("[DELETE_LINES_START]", filePath, "target_line:", targetLine);
+              
+              // Show delete view in computer panel (will be filled after execution)
+              setCodeStreaming({
+                filePath,
+                content: "",
+                isStreaming: true,
+                tool: "Delete",
+                action: `Deleting from ${filePath}`,
+                isDeleteView: true,
+                deletedLines: "",
+                startLine: 0,
+                endLine: 0,
+              });
+              
+              // Create delete lines card entry
+              const deleteEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "delete_lines_card",
+                filePath,
+                fileStatus: "deleting",
+                targetLine,
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentDeleteLinesCardId = deleteEntry.id;
+              addChatEntry(deleteEntry);
+            }
+            break;
+          
+          case "delete_lines_end":
+            {
+              const result = event.result as DeleteLinesResult;
+              console.log("[DELETE_LINES_END]", event.file_path, result?.success);
+              
+              // Update the delete lines card with result
+              if (currentDeleteLinesCardId) {
+                updateChatEntry(currentDeleteLinesCardId, {
+                  fileStatus: result?.success ? "deleted" : "error",
+                  deleteResult: result,
+                  deletedLines: result?.deleted_lines || "",
+                });
+                currentDeleteLinesCardId = null;
+              }
+              
+              // Show deleted lines in computer panel
+              if (result?.success && result?.deleted_lines) {
+                setCodeStreaming({
+                  isStreaming: false,
+                  deletedLines: result.deleted_lines,
+                  startLine: result.start_line || 0,
+                  endLine: result.end_line || 0,
+                });
+              } else {
+                setCodeStreaming({ 
+                  isStreaming: false,
+                });
+              }
+              
+              // Refresh file tree after deletion
+              fetchFileTree();
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
@@ -480,13 +549,17 @@ export function ChatPanel() {
               updateChatEntry(currentInsertLineCardId, { fileStatus: "error" });
               currentInsertLineCardId = null;
             }
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
+            if (currentDeleteLinesCardId) {
+              updateChatEntry(currentDeleteLinesCardId, { fileStatus: "error" });
+              currentDeleteLinesCardId = null;
+            }
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
             break;
             
           case "complete":
             fetchMemory();
             fetchFileTree();  // Refresh file tree after completion
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
             break;
             
           case "max_iterations_reached":
@@ -496,7 +569,7 @@ export function ChatPanel() {
               content: `Maximum iterations (${event.max_iterations}) reached. The agent has stopped.`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
             break;
             
           case "error":
@@ -506,12 +579,12 @@ export function ChatPanel() {
               content: `Error: ${event.error}`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
             break;
             
           case "stream_end":
             setIsAgentRunning(false);
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
             break;
         }
       });
@@ -522,7 +595,7 @@ export function ChatPanel() {
         content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
         timestamp: new Date(),
       });
-      setCodeStreaming({ isStreaming: false });
+      setCodeStreaming({ isStreaming: false, isDeleteView: false });
     } finally {
       setIsAgentRunning(false);
     }

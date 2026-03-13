@@ -89,7 +89,7 @@ Use the insert_line tool to add new content into an existing file at a specific 
 
 **When NOT to use insert_line (use other tools):**
 - Replacing existing text (use replace_in_file)
-- Deleting lines (use replace_in_file with empty new_string)
+- Deleting lines (use delete_lines_from_file)
 - Creating a new file (use file_write)
 - Rewriting most of a file's content (use file_write)
 
@@ -114,6 +114,41 @@ To add a print statement after line 5:
 - file_path: "/home/user/project/src/app.py"
 - insert_line: 5
 - new_str: "print('Server started successfully')"
+
+### delete_lines_from_file
+Use the delete_lines_from_file tool to delete specific lines from an existing file using an exact line number or a line range. This tool safely removes unwanted code or text without modifying other parts of the file.
+
+**When to use delete_lines_from_file:**
+- Removing a specific line of code
+- Deleting multiple consecutive lines
+- Refactoring by removing outdated or unused code
+- Fixing errors that require removing lines
+- Cleaning up imports, comments, or dead code
+
+**When NOT to use delete_lines_from_file (use other tools):**
+- Replacing text (use replace_in_file)
+- Adding new lines (use insert_line)
+- Creating a new file (use file_write)
+- Rewriting most of a file (use file_write)
+
+**delete_lines_from_file parameters:**
+- `path` (required): Absolute path to the file (MUST start with /home/user/)
+- `target_line` (required): Line number to delete (e.g. 15) or line range to delete (e.g. '20-22'). Line numbers are 1-based.
+
+**IMPORTANT RULES:**
+- Line numbers are 1-based (the first line of the file is line 1)
+- Always use the Read tool first to verify the correct line numbers before calling this tool
+- Never guess line numbers — always verify by reading the file
+- Avoid deleting large ranges unless clearly necessary
+
+**Example usage:**
+To delete a single line (line 15):
+- path: "/home/user/project/src/app.py"
+- target_line: 15
+
+To delete a range of lines (lines 20 through 22):
+- path: "/home/user/project/src/app.py"
+- target_line: "20-22"
 
 ## Your Workflow
 1. **Understand**: Parse and understand what the user wants to build

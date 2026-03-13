@@ -16,6 +16,11 @@ export interface CodeStreamingState {
   isInsertView: boolean;
   insertLine: number;
   newStr: string;
+  // Delete view state for delete_lines_from_file tool
+  isDeleteView: boolean;
+  deletedLines: string;
+  startLine: number;
+  endLine: number;
 }
 
 export interface TerminalBufferData {
@@ -125,6 +130,10 @@ const initialCodeStreamingState: CodeStreamingState = {
   isInsertView: false,
   insertLine: 0,
   newStr: "",
+  isDeleteView: false,
+  deletedLines: "",
+  startLine: 0,
+  endLine: 0,
 };
 
 export const useStore = create<AppState>()(
