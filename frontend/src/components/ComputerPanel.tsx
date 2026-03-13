@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2 } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -135,6 +135,42 @@ function DeleteView({ filePath, deletedLines, startLine, endLine }: { filePath: 
   );
 }
 
+// Delete string view component for delete_str_from_file tool
+function DeleteStrView({ filePath, targetStr }: { filePath: string; targetStr: string }) {
+  const lines = targetStr.split('\n');
+  
+  return (
+    <div className="font-mono text-[10px] xs:text-[11px] sm:text-[13px] leading-5 xs:leading-6 sm:leading-7">
+      {/* File path header */}
+      <div className="px-3 py-2 bg-zinc-200 border-b border-zinc-300 text-zinc-600 font-medium">
+        {filePath}
+      </div>
+      
+      {/* Delete info */}
+      <div className="px-3 py-2 bg-red-50 border-b border-red-200 text-red-600 text-[10px] xs:text-[11px]">
+        Deleting exact string match
+      </div>
+      
+      {/* Deleted text - all highlighted in red */}
+      <div className="bg-red-50">
+        <div className="px-2 py-1 text-[9px] xs:text-[10px] text-red-600 font-medium uppercase tracking-wide border-b border-red-100">
+          Removed
+        </div>
+        {lines.map((line, index) => (
+          <div key={`delete-str-${index}`} className="flex group hover:bg-red-100/50">
+            <span className="select-none w-8 sm:w-10 text-right pr-3 text-red-300 flex-shrink-0 bg-red-100/30">
+              -
+            </span>
+            <span className="flex-1 text-red-700 bg-red-50 px-2 whitespace-pre-wrap break-all">
+              {line || '\u00A0'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ComputerPanel() {
   const { codeStreaming, isAgentRunning } = useStore();
   const codeContainerRef = useRef<HTMLDivElement>(null);
@@ -227,7 +263,9 @@ export function ComputerPanel() {
         
         <div data-design-id="computer-status" className="flex items-center gap-1.5 xs:gap-2 sm:gap-3">
           <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 rounded-md xs:rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 bg-secondary">
-            {codeStreaming.isDeleteView ? (
+            {codeStreaming.isDeleteStrView ? (
+              <Eraser className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+            ) : codeStreaming.isDeleteView ? (
               <Trash2 className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             ) : codeStreaming.isDiffView ? (
               <Replace className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5 text-muted-foreground" />
@@ -257,13 +295,19 @@ export function ComputerPanel() {
                 <span className="truncate">Inserting into {codeStreaming.filePath}</span>
               </div>
             )}
+            {codeStreaming.isDeleteStrView && codeStreaming.filePath && (
+              <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-red-500/10 text-red-600 border-red-500/30">
+                <Eraser className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
+                <span className="truncate">Deleting from {codeStreaming.filePath}</span>
+              </div>
+            )}
             {codeStreaming.isDeleteView && codeStreaming.filePath && (
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-red-500/10 text-red-600 border-red-500/30">
                 <Trash2 className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
                 <span className="truncate">Deleting from {codeStreaming.filePath}</span>
               </div>
             )}
-            {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && !codeStreaming.isDeleteView && (
+            {codeStreaming.isStreaming && codeStreaming.filePath && !codeStreaming.isDiffView && !codeStreaming.isDeleteView && !codeStreaming.isDeleteStrView && (
               <div className="flex items-center gap-1 mt-0.5 xs:mt-1 px-1.5 xs:px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-xs border max-w-full bg-accent text-muted-foreground border-border/50">
                 {codeStreaming.tool === "Reader" ? (
                   <BookOpen className="w-2.5 h-2.5 xs:w-3 xs:h-3 flex-shrink-0" />
@@ -279,7 +323,7 @@ export function ComputerPanel() {
                 <span className="truncate">Read {codeStreaming.filePath}</span>
               </div>
             )}
-            {!codeStreaming.isStreaming && !codeStreaming.content && !codeStreaming.isDiffView && (
+            {!codeStreaming.isStreaming && !codeStreaming.content && !codeStreaming.isDiffView && !codeStreaming.isDeleteStrView && (
               <span className="text-[10px] xs:text-[11px] sm:text-xs text-muted-foreground">Waiting for agent...</span>
             )}
           </div>
@@ -300,7 +344,12 @@ export function ComputerPanel() {
             className="flex-1 overflow-auto bg-[#f5f5f5] p-1.5 xs:p-2 sm:p-3"
           >
             {/* Diff view for replace_in_file tool */}
-            {codeStreaming.isDiffView && codeStreaming.oldString && codeStreaming.newString ? (
+            {codeStreaming.isDeleteStrView && codeStreaming.targetStr ? (
+              <DeleteStrView 
+                filePath={codeStreaming.filePath}
+                targetStr={codeStreaming.targetStr}
+              />
+            ) : codeStreaming.isDiffView && codeStreaming.oldString && codeStreaming.newString ? (
               <DiffView 
                 filePath={codeStreaming.filePath}
                 oldString={codeStreaming.oldString}

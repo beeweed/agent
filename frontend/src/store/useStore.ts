@@ -21,6 +21,9 @@ export interface CodeStreamingState {
   deletedLines: string;
   startLine: number;
   endLine: number;
+  // Delete str view state for delete_str_from_file tool
+  isDeleteStrView: boolean;
+  targetStr: string;
 }
 
 export interface TerminalBufferData {
@@ -134,6 +137,8 @@ const initialCodeStreamingState: CodeStreamingState = {
   deletedLines: "",
   startLine: 0,
   endLine: 0,
+  isDeleteStrView: false,
+  targetStr: "",
 };
 
 export const useStore = create<AppState>()(

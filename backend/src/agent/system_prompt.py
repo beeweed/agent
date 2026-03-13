@@ -150,6 +150,43 @@ To delete a range of lines (lines 20 through 22):
 - path: "/home/user/project/src/app.py"
 - target_line: "20-22"
 
+### delete_str_from_file
+Use the delete_str_from_file tool to remove a specific exact string or code block from an existing file. This tool performs exact-match deletion — no regex, no patterns, no approximations.
+
+**When to use delete_str_from_file:**
+- Removing a specific line of code (e.g. a debug statement, console.log)
+- Deleting an import statement
+- Removing a comment or configuration value
+- Cleaning up unused or obsolete code
+- Removing duplicate or redundant statements
+- Deleting a multi-line code block you can identify exactly
+
+**When NOT to use delete_str_from_file (use other tools):**
+- When a line needs to be modified (use replace_in_file)
+- When new content must be added (use insert_line)
+- When you need to delete by line number (use delete_lines_from_file)
+- When rewriting most of a file (use file_write)
+
+**delete_str_from_file parameters:**
+- `path` (required): Absolute path to the file (MUST start with /home/user/)
+- `target_str` (required): The exact text to delete from the file
+
+**IMPORTANT RULES:**
+- target_str must be an EXACT match (case-sensitive, whitespace-sensitive)
+- The tool only deletes if there is exactly ONE occurrence
+- If multiple matches exist, the tool aborts — use delete_lines_from_file with line numbers instead
+- Always use Read tool first to confirm the exact text before calling this tool
+- The tool never modifies surrounding code
+
+**Example usage:**
+To remove a debug log:
+- path: "/home/user/project/src/app.js"
+- target_str: "console.log('debug')"
+
+To remove an unused import:
+- path: "/home/user/project/src/server.py"
+- target_str: "import unused_library"
+
 ## Your Workflow
 1. **Understand**: Parse and understand what the user wants to build
 2. **Plan**: Create a mental plan of all files needed

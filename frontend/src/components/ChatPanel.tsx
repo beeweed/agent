@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -122,6 +122,7 @@ export function ChatPanel() {
     let currentReplaceInFileCardId: string | null = null;
     let currentInsertLineCardId: string | null = null;
     let currentDeleteLinesCardId: string | null = null;
+    let currentDeleteStrCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -527,6 +528,62 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+          
+          case "delete_str_from_file_start":
+            {
+              const filePath = event.file_path || "";
+              const targetStr = event.target_str || "";
+              console.log("[DELETE_STR_FROM_FILE_START]", filePath);
+              
+              // Show delete str view in computer panel
+              setCodeStreaming({
+                filePath,
+                content: "",
+                isStreaming: true,
+                tool: "Delete",
+                action: `Deleting from ${filePath}`,
+                isDeleteStrView: true,
+                targetStr,
+              });
+              
+              // Create delete str card entry
+              const deleteStrEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "delete_str_from_file_card",
+                filePath,
+                fileStatus: "deleting_str",
+                targetStr,
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentDeleteStrCardId = deleteStrEntry.id;
+              addChatEntry(deleteStrEntry);
+            }
+            break;
+          
+          case "delete_str_from_file_end":
+            {
+              const result = event.result as DeleteStrFromFileResult;
+              console.log("[DELETE_STR_FROM_FILE_END]", event.file_path, result?.success);
+              
+              // Update the delete str card with result
+              if (currentDeleteStrCardId) {
+                updateChatEntry(currentDeleteStrCardId, {
+                  fileStatus: result?.success ? "deleted_str" : "error",
+                  deleteStrResult: result,
+                });
+                currentDeleteStrCardId = null;
+              }
+              
+              // Keep showing the delete str view but mark streaming as complete
+              setCodeStreaming({ 
+                isStreaming: false,
+              });
+              
+              // Refresh file tree after deletion
+              fetchFileTree();
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
@@ -553,13 +610,17 @@ export function ChatPanel() {
               updateChatEntry(currentDeleteLinesCardId, { fileStatus: "error" });
               currentDeleteLinesCardId = null;
             }
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
+            if (currentDeleteStrCardId) {
+              updateChatEntry(currentDeleteStrCardId, { fileStatus: "error" });
+              currentDeleteStrCardId = null;
+            }
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;
             
           case "complete":
             fetchMemory();
             fetchFileTree();  // Refresh file tree after completion
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;
             
           case "max_iterations_reached":
@@ -569,7 +630,7 @@ export function ChatPanel() {
               content: `Maximum iterations (${event.max_iterations}) reached. The agent has stopped.`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;
             
           case "error":
@@ -579,12 +640,12 @@ export function ChatPanel() {
               content: `Error: ${event.error}`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;
             
           case "stream_end":
             setIsAgentRunning(false);
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;
         }
       });
@@ -595,7 +656,7 @@ export function ChatPanel() {
         content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
         timestamp: new Date(),
       });
-      setCodeStreaming({ isStreaming: false, isDeleteView: false });
+      setCodeStreaming({ isStreaming: false, isDeleteView: false, isDeleteStrView: false });
     } finally {
       setIsAgentRunning(false);
     }

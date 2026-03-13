@@ -99,6 +99,14 @@ export interface DeleteLinesResult {
   error?: string;
 }
 
+export interface DeleteStrFromFileResult {
+  success: boolean;
+  message?: string;
+  file_path?: string;
+  target_str?: string;
+  error?: string;
+}
+
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -129,7 +137,9 @@ export interface AgentEvent {
     | "insert_line_start"
     | "insert_line_end"
     | "delete_lines_start"
-    | "delete_lines_end";
+    | "delete_lines_end"
+    | "delete_str_from_file_start"
+    | "delete_str_from_file_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -137,7 +147,7 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ShellResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult;
+  result?: ToolResult | ReadFileResult | ShellResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -150,6 +160,7 @@ export interface AgentEvent {
   insert_line?: number;  // For insert_line tool
   new_str?: string;  // For insert_line tool
   target_line?: number | string;  // For delete_lines_from_file tool
+  target_str?: string;  // For delete_str_from_file tool
 }
 
 export interface Model {
@@ -185,10 +196,10 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
   content?: string;
   filePath?: string;
-  fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted";
+  fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
   iteration?: number;
   toolName?: string;
   arguments?: Record<string, unknown>;
@@ -198,6 +209,7 @@ export interface ChatEntry {
   replaceResult?: ReplaceInFileResult;
   insertResult?: InsertLineResult;
   deleteResult?: DeleteLinesResult;
+  deleteStrResult?: DeleteStrFromFileResult;
   shellCommand?: string;
   shellSessionName?: string;
   shellStatus?: "running" | "completed" | "error" | "server_running";
@@ -211,4 +223,5 @@ export interface ChatEntry {
   newStr?: string;  // For insert_line tool
   targetLine?: number | string;  // For delete_lines_from_file tool
   deletedLines?: string;  // For delete_lines_from_file tool
+  targetStr?: string;  // For delete_str_from_file tool
 }
