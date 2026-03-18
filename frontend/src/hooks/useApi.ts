@@ -3,6 +3,10 @@ import { useStore } from "@/store/useStore";
 import type { AgentEvent, FileNode, Model, Memory } from "@/types";
 
 const getApiBase = () => {
+  // Use env variable if set
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, "");
+
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
