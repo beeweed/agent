@@ -6,7 +6,8 @@ from typing import Optional, Dict
 import json
 import asyncio
 
-from .agent.react_agent import ReActAgent, submit_shell_output
+from .agent.react_agent import ReActAgent
+from .agent.tool_executor import submit_shell_output
 from .services.openrouter import fetch_models
 from .services.e2b_sandbox import sandbox_manager
 
