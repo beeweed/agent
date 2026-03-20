@@ -118,7 +118,6 @@ export function ChatPanel() {
     let currentFileCardId: string | null = null;
     let currentThoughtId: string | null = null;
     let currentReadFileCardId: string | null = null;
-    let currentShellCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
     let currentInsertLineCardId: string | null = null;
     let currentDeleteLinesCardId: string | null = null;
@@ -304,42 +303,6 @@ export function ChatPanel() {
               } else {
                 setCodeStreaming({ isStreaming: false });
               }
-            }
-            break;
-          
-          case "shell_exec_start":
-            {
-              const sessionName = event.session_name || "main";
-              const command = event.command || "";
-              const commandId = event.command_id || "";
-              console.log("[SHELL_EXEC_START]", sessionName, command, "command_id:", commandId);
-              
-              // Create shell card entry with embedded terminal
-              // Include command_id so EmbeddedTerminal can POST output back to backend
-              const shellEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "shell_card",
-                shellCommand: command,
-                shellSessionName: sessionName,
-                shellStatus: "running",
-                shellCommandId: commandId,  // Critical: used for output coordination
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentShellCardId = shellEntry.id;
-              addChatEntry(shellEntry);
-              // The EmbeddedTerminal component will handle execution and POST output
-            }
-            break;
-          
-          case "shell_exec_end":
-            {
-              // The EmbeddedTerminal component handles updating the status
-              // Just reset the current shell card ID
-              console.log("[SHELL_EXEC_END]", event.command);
-              currentShellCardId = null;
-              // Refresh file tree after shell command
-              fetchFileTree();
             }
             break;
           
@@ -593,10 +556,6 @@ export function ChatPanel() {
             if (currentReadFileCardId) {
               updateChatEntry(currentReadFileCardId, { fileStatus: "error" });
               currentReadFileCardId = null;
-            }
-            if (currentShellCardId) {
-              updateChatEntry(currentShellCardId, { shellStatus: "error" });
-              currentShellCardId = null;
             }
             if (currentReplaceInFileCardId) {
               updateChatEntry(currentReplaceInFileCardId, { fileStatus: "error" });

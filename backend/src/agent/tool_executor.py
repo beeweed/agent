@@ -8,58 +8,9 @@ No prompt parsing. No manual routing. Called directly from the agent loop
 after the API returns a structured tool_call object.
 """
 
-import asyncio
-import uuid
-from typing import Dict, Any, Optional, Callable, Awaitable
+from typing import Dict, Callable, Awaitable
 
 from ..services.e2b_sandbox import sandbox_manager
-
-
-# ---------------------------------------------------------------------------
-# Shell output coordination (frontend executes, posts result back)
-# ---------------------------------------------------------------------------
-
-_pending_shell_outputs: Dict[str, Dict[str, Any]] = {}
-_shell_output_events: Dict[str, asyncio.Event] = {}
-
-
-def register_shell_command(command_id: str) -> asyncio.Event:
-    _pending_shell_outputs[command_id] = {
-        "output": "",
-        "completed": False,
-        "error": None,
-        "success": None,
-    }
-    _shell_output_events[command_id] = asyncio.Event()
-    return _shell_output_events[command_id]
-
-
-def submit_shell_output(
-    command_id: str,
-    output: str,
-    success: bool = True,
-    error: Optional[str] = None,
-):
-    if command_id in _pending_shell_outputs:
-        _pending_shell_outputs[command_id] = {
-            "output": output,
-            "completed": True,
-            "success": success,
-            "error": error,
-        }
-        if command_id in _shell_output_events:
-            _shell_output_events[command_id].set()
-
-
-def get_shell_output(command_id: str) -> Dict[str, Any]:
-    return _pending_shell_outputs.get(
-        command_id, {"output": "", "completed": False, "error": None}
-    )
-
-
-def cleanup_shell_command(command_id: str):
-    _pending_shell_outputs.pop(command_id, None)
-    _shell_output_events.pop(command_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -87,59 +38,7 @@ async def execute_file_read(session_id: str, arguments: dict) -> dict:
     return await sandbox_manager.read_file(session_id, file_path)
 
 
-async def execute_shell(
-    session_id: str,
-    arguments: dict,
-    command_id: str,
-) -> dict:
-    command = arguments.get("command", "")
-    session_name = arguments.get("session_name", "main")
-
-    if not command:
-        return {"success": False, "error": "No command provided", "session_name": session_name}
-
-    sandbox = await sandbox_manager.get_sandbox(session_id)
-    if not sandbox:
-        return {"success": False, "error": "No sandbox found.", "session_name": session_name}
-
-    completion_event = register_shell_command(command_id)
-
-    try:
-        await asyncio.wait_for(completion_event.wait(), timeout=300)
-    except asyncio.TimeoutError:
-        cleanup_shell_command(command_id)
-        return {
-            "success": False,
-            "error": "Command timed out (300s)",
-            "session_name": session_name,
-            "command": command,
-        }
-
-    result = get_shell_output(command_id)
-    cleanup_shell_command(command_id)
-
-    output = result.get("output", "")
-    error = result.get("error")
-    success = result.get("success", True)
-
-    if error:
-        return {
-            "success": False,
-            "error": error,
-            "output": output,
-            "session_name": session_name,
-            "command": command,
-        }
-
-    return {
-        "success": success,
-        "output": output.strip() if output else "(no output)",
-        "session_name": session_name,
-        "command": command,
-    }
-
-
-async def _read_raw_content(session_id: str, file_path: str) -> Optional[str]:
+async def _read_raw_content(session_id: str, file_path: str):
     """Read raw file content (no line numbers) for edit operations."""
     result = await sandbox_manager.read_file(session_id, file_path)
     if not result.get("success"):
@@ -314,7 +213,6 @@ async def execute_delete_str(session_id: str, arguments: dict) -> dict:
 TOOL_EXECUTORS: Dict[str, Callable[..., Awaitable[dict]]] = {
     "file_write": execute_file_write,
     "file_read": execute_file_read,
-    "shell": execute_shell,
     "replace_in_file": execute_replace_in_file,
     "insert_line": execute_insert_line,
     "delete_lines": execute_delete_lines,

@@ -2,7 +2,6 @@ import type { ChatEntry } from "@/types";
 import { useStore } from "@/store/useStore";
 import { Code, Eye, Check, Loader2, AlertCircle, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
 import { MessageContent } from "./MessageContent";
-import { EmbeddedTerminal } from "./EmbeddedTerminal";
 
 function AnygentLogo() {
   return (
@@ -178,19 +177,6 @@ export function ChatMessage({ entry }: ChatMessageProps) {
             </button>
           )}
         </div>
-      </div>
-    );
-  }
-
-  if (entry.type === "shell_card") {
-    return (
-      <div data-design-id={`shell-card-${entry.id}`} className="animate-fade-in pl-6 xs:pl-8 sm:pl-10">
-        <EmbeddedTerminal
-          command={entry.shellCommand || ""}
-          sessionName={entry.shellSessionName || "main"}
-          entryId={entry.id}
-          commandId={entry.shellCommandId || ""}
-        />
       </div>
     );
   }

@@ -26,18 +26,6 @@ export interface CodeStreamingState {
   targetStr: string;
 }
 
-export interface TerminalBufferData {
-  id: string;
-  name: string;
-  buffer: string;
-}
-
-export interface PendingShellCommand {
-  sessionName: string;
-  command: string;
-  timestamp: number;
-}
-
 export type SandboxStatus = "idle" | "creating" | "ready" | "error";
 
 interface AppState {
@@ -106,19 +94,6 @@ interface AppState {
   setCodeStreaming: (state: Partial<CodeStreamingState>) => void;
   resetCodeStreaming: () => void;
   appendStreamingCode: (content: string) => void;
-  
-  // Terminal data persistence
-  terminalBuffers: Record<string, TerminalBufferData>;
-  setTerminalBuffer: (id: string, data: TerminalBufferData) => void;
-  appendTerminalBuffer: (id: string, content: string) => void;
-  getTerminalBuffer: (id: string) => TerminalBufferData | undefined;
-  clearTerminalBuffer: (id: string) => void;
-  
-  // Pending shell commands from LLM
-  pendingShellCommands: PendingShellCommand[];
-  addPendingShellCommand: (command: PendingShellCommand) => void;
-  consumePendingShellCommand: () => PendingShellCommand | undefined;
-  clearPendingShellCommands: () => void;
 }
 
 const initialCodeStreamingState: CodeStreamingState = {
@@ -234,55 +209,6 @@ export const useStore = create<AppState>()(
             content: state.codeStreaming.content + content,
           },
         })),
-      
-      // Terminal data persistence
-      terminalBuffers: {},
-      setTerminalBuffer: (id, data) =>
-        set((state) => ({
-          terminalBuffers: { ...state.terminalBuffers, [id]: data },
-        })),
-      appendTerminalBuffer: (id, content) =>
-        set((state) => {
-          const existing = state.terminalBuffers[id];
-          if (existing) {
-            // Keep buffer size manageable (last 100KB)
-            let newBuffer = existing.buffer + content;
-            if (newBuffer.length > 100000) {
-              newBuffer = newBuffer.slice(-50000);
-            }
-            return {
-              terminalBuffers: {
-                ...state.terminalBuffers,
-                [id]: { ...existing, buffer: newBuffer },
-              },
-            };
-          }
-          return state;
-        }),
-      getTerminalBuffer: (id) => {
-        return useStore.getState().terminalBuffers[id];
-      },
-      clearTerminalBuffer: (id) =>
-        set((state) => {
-          const { [id]: _, ...rest } = state.terminalBuffers;
-          return { terminalBuffers: rest };
-        }),
-      
-      // Pending shell commands from LLM
-      pendingShellCommands: [],
-      addPendingShellCommand: (command) =>
-        set((state) => ({
-          pendingShellCommands: [...state.pendingShellCommands, command],
-        })),
-      consumePendingShellCommand: () => {
-        const state = useStore.getState();
-        if (state.pendingShellCommands.length === 0) return undefined;
-        const [first, ...rest] = state.pendingShellCommands;
-        useStore.setState({ pendingShellCommands: rest });
-        return first;
-      },
-      clearPendingShellCommands: () =>
-        set({ pendingShellCommands: [] }),
     }),
     {
       name: "anygent-storage",
@@ -291,7 +217,6 @@ export const useStore = create<AppState>()(
         e2bApiKey: state.e2bApiKey,
         e2bTemplateId: state.e2bTemplateId,
         selectedModel: state.selectedModel,
-        terminalBuffers: state.terminalBuffers,
       }),
     }
   )
