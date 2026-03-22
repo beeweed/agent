@@ -17,7 +17,6 @@ import {
 interface E2BSandboxState {
   isConnected: boolean;
   isConnecting: boolean;
-  sandboxId: string | null;
   error: string | null;
 }
 
@@ -25,44 +24,50 @@ const useE2BSandbox = () => {
   const [state, setState] = useState<E2BSandboxState>({
     isConnected: false,
     isConnecting: false,
-    sandboxId: null,
     error: null,
   });
 
   const sandboxRef = useRef<Sandbox | null>(null);
   const terminalRef = useRef<{ pid: number; dataCallback: (data: Uint8Array) => void } | null>(null);
+  const currentSandboxIdRef = useRef<string | null>(null);
 
-  const createSandbox = useCallback(async (apiKey: string) => {
-    if (!apiKey) {
-      setState(prev => ({ ...prev, error: 'E2B API key not configured. Please set it in Settings.' }));
+  // Connect to an existing sandbox using sandbox_id
+  const connectToSandbox = useCallback(async (sandboxId: string, apiKey: string) => {
+    if (!sandboxId || !apiKey) {
+      setState(prev => ({ ...prev, error: 'Missing sandbox ID or API key' }));
       return null;
+    }
+
+    // Skip if already connected to this sandbox
+    if (currentSandboxIdRef.current === sandboxId && sandboxRef.current) {
+      return sandboxRef.current;
     }
 
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const sandbox = await Sandbox.create({
+      // Connect to the existing sandbox
+      const sandbox = await Sandbox.connect(sandboxId, {
         apiKey: apiKey,
-        timeoutMs: 60 * 60 * 1000,
       });
 
       sandboxRef.current = sandbox;
+      currentSandboxIdRef.current = sandboxId;
 
       setState(prev => ({
         ...prev,
         isConnected: true,
         isConnecting: false,
-        sandboxId: sandbox.sandboxId,
         error: null,
       }));
 
       return sandbox;
-    } catch (error: any) {
-      console.error('Failed to create sandbox:', error);
+    } catch (error) {
+      console.error('Failed to connect to sandbox:', error);
       setState(prev => ({
         ...prev,
         isConnecting: false,
-        error: error.message || 'Failed to create sandbox',
+        error: error instanceof Error ? error.message : 'Failed to connect to sandbox',
       }));
       return null;
     }
@@ -100,9 +105,9 @@ const useE2BSandbox = () => {
 
       terminalRef.current = { pid: terminal.pid, dataCallback: onData };
       return terminal;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to create terminal:', error);
-      setState(prev => ({ ...prev, error: error.message }));
+      setState(prev => ({ ...prev, error: error instanceof Error ? error.message : 'Failed to create terminal' }));
       return null;
     }
   }, []);
@@ -115,7 +120,7 @@ const useE2BSandbox = () => {
         terminalRef.current.pid,
         new TextEncoder().encode(data)
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to send terminal input:', error);
     }
   }, []);
@@ -125,7 +130,7 @@ const useE2BSandbox = () => {
 
     try {
       await sandboxRef.current.pty.sendInput(terminalRef.current.pid, data);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to send binary terminal input:', error);
     }
   }, []);
@@ -135,43 +140,37 @@ const useE2BSandbox = () => {
 
     try {
       await sandboxRef.current.pty.resize(terminalRef.current.pid, { cols, rows });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to resize terminal:', error);
     }
   }, []);
 
-  const disconnectSandbox = useCallback(async () => {
-    if (sandboxRef.current) {
-      try {
-        await sandboxRef.current.kill();
-      } catch (error) {
-        console.error('Error killing sandbox:', error);
-      }
-      sandboxRef.current = null;
-      terminalRef.current = null;
-    }
+  const disconnect = useCallback(() => {
+    // Don't kill the sandbox, just disconnect
+    sandboxRef.current = null;
+    terminalRef.current = null;
+    currentSandboxIdRef.current = null;
 
     setState(prev => ({
       ...prev,
       isConnected: false,
-      sandboxId: null,
     }));
   }, []);
 
   return {
     ...state,
-    createSandbox,
+    connectToSandbox,
     createTerminal,
     sendTerminalInput,
     sendTerminalBinaryInput,
     resizeTerminal,
-    disconnectSandbox,
+    disconnect,
   };
 };
 
 interface TerminalComponentProps {
   isConnected: boolean;
-  onCreateTerminal: (cols: number, rows: number, onData: (data: Uint8Array) => void) => Promise<any>;
+  onCreateTerminal: (cols: number, rows: number, onData: (data: Uint8Array) => void) => Promise<{ pid: number } | null>;
   onSendInput: (data: string) => Promise<void>;
   onSendBinaryInput: (data: Uint8Array) => Promise<void>;
   onResize: (cols: number, rows: number) => Promise<void>;
@@ -519,25 +518,38 @@ const TerminalComponent: React.FC<TerminalComponentProps> = ({
 };
 
 export function EmbeddedTerminal() {
-  const { e2bApiKey } = useStore();
+  const { e2bApiKey, sandboxId, sandboxStatus } = useStore();
 
   const {
     isConnected,
     isConnecting,
     error: sandboxError,
-    createSandbox,
+    connectToSandbox,
     createTerminal,
     sendTerminalInput,
     sendTerminalBinaryInput,
     resizeTerminal,
-    disconnectSandbox,
+    disconnect,
   } = useE2BSandbox();
 
   const hasApiKey = !!e2bApiKey;
+  const hasSandboxId = !!sandboxId;
 
-  const handleConnect = useCallback(() => {
-    createSandbox(e2bApiKey);
-  }, [createSandbox, e2bApiKey]);
+  // Auto-connect when sandboxId becomes available
+  useEffect(() => {
+    if (sandboxId && e2bApiKey && !isConnected && !isConnecting) {
+      console.log('[Terminal] Auto-connecting to sandbox:', sandboxId);
+      connectToSandbox(sandboxId, e2bApiKey);
+    }
+  }, [sandboxId, e2bApiKey, isConnected, isConnecting, connectToSandbox]);
+
+  // Disconnect when sandbox is cleared (e.g., on reset)
+  useEffect(() => {
+    if (!sandboxId && isConnected) {
+      console.log('[Terminal] Sandbox cleared, disconnecting...');
+      disconnect();
+    }
+  }, [sandboxId, isConnected, disconnect]);
 
   if (isConnected) {
     return (
@@ -566,6 +578,9 @@ export function EmbeddedTerminal() {
       >
         <TerminalSquare size={14} style={{ color: '#999' }} className="mr-2" />
         <span data-design-id="terminal-idle-title" className="text-xs font-medium" style={{ color: '#666' }}>Terminal</span>
+        {isConnecting && (
+          <Loader2 size={12} className="animate-spin ml-2" style={{ color: '#2980b9' }} />
+        )}
       </div>
 
       {sandboxError && (
@@ -578,34 +593,52 @@ export function EmbeddedTerminal() {
         <div data-design-id="terminal-idle-icon" className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#e0e0e0' }}>
           <TerminalSquare size={24} style={{ color: '#999' }} />
         </div>
-        <p data-design-id="terminal-idle-text" className="text-xs mb-3 text-center" style={{ color: '#888' }}>
-          Connect to a cloud sandbox terminal
-        </p>
-
-        {hasApiKey ? (
-          <button
-            data-design-id="terminal-connect-btn"
-            onClick={handleConnect}
-            disabled={isConnecting}
-            className="flex items-center gap-1.5 text-xs font-medium py-1.5 px-4 rounded-lg transition-colors disabled:opacity-50"
-            style={{ backgroundColor: '#27ae60', color: '#fff' }}
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Connecting...</span>
-              </>
-            ) : (
-              <>
-                <TerminalSquare size={14} />
-                <span>Connect Terminal</span>
-              </>
-            )}
-          </button>
+        
+        {isConnecting ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 size={16} className="animate-spin" style={{ color: '#2980b9' }} />
+              <p data-design-id="terminal-connecting-text" className="text-sm font-medium" style={{ color: '#2980b9' }}>
+                Connecting to sandbox...
+              </p>
+            </div>
+            <p className="text-xs" style={{ color: '#999' }}>
+              Terminal will be ready shortly
+            </p>
+          </>
+        ) : sandboxStatus === "creating" ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 size={16} className="animate-spin" style={{ color: '#f39c12' }} />
+              <p data-design-id="terminal-sandbox-creating-text" className="text-sm font-medium" style={{ color: '#f39c12' }}>
+                Creating sandbox...
+              </p>
+            </div>
+            <p className="text-xs" style={{ color: '#999' }}>
+              Terminal will auto-connect when ready
+            </p>
+          </>
+        ) : hasSandboxId ? (
+          <>
+            <p data-design-id="terminal-idle-text" className="text-sm font-medium mb-1" style={{ color: '#666' }}>
+              Sandbox available
+            </p>
+            <p className="text-xs" style={{ color: '#999' }}>
+              Auto-connecting...
+            </p>
+          </>
         ) : (
-          <p data-design-id="terminal-no-key-text" className="text-[10px] text-center" style={{ color: '#aaa' }}>
-            Set your E2B API key in Settings to use the terminal
-          </p>
+          <>
+            <p data-design-id="terminal-idle-text" className="text-sm font-medium mb-1" style={{ color: '#666' }}>
+              Terminal will connect automatically
+            </p>
+            <p className="text-xs text-center" style={{ color: '#999' }}>
+              {hasApiKey 
+                ? "Send a message to create a sandbox"
+                : "Set your E2B API key in Settings first"
+              }
+            </p>
+          </>
         )}
       </div>
     </div>

@@ -65,6 +65,7 @@ export function ChatPanel() {
     e2bTemplateId,
     sandboxStatus,
     setSandboxStatus,
+    setSandboxId,
     setCodeStreaming,
     resetCodeStreaming,
   } = useStore();
@@ -132,6 +133,10 @@ export function ChatPanel() {
             
           case "sandbox_ready":
             setSandboxStatus("ready");
+            // Store sandbox_id for terminal connection
+            if (event.sandbox_id) {
+              setSandboxId(event.sandbox_id);
+            }
             break;
             
           case "sandbox_error":

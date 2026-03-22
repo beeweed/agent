@@ -145,6 +145,7 @@ export interface AgentEvent {
   new_str?: string;  // For insert_line tool
   target_line?: number | string;  // For delete_lines_from_file tool
   target_str?: string;  // For delete_str_from_file tool
+  sandbox_id?: string;  // For sandbox_ready event
 }
 
 export interface Model {

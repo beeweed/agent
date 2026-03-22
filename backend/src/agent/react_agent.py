@@ -222,7 +222,15 @@ class ReActAgent:
             yield {"type": "sandbox_error", "error": sandbox_result.get("error", "Failed to create sandbox")}
             self.is_running = False
             return
-        yield {"type": "sandbox_ready", "message": "Sandbox ready"}
+        
+        # Get sandbox_id for frontend terminal connection
+        sandbox_status = await sandbox_manager.get_sandbox_status(self.session_id)
+        sandbox_id = sandbox_status.get("info", {}).get("sandbox_id", "")
+        yield {
+            "type": "sandbox_ready", 
+            "message": "Sandbox ready",
+            "sandbox_id": sandbox_id
+        }
 
         self.context.add_user_message(user_message)
         yield {"type": "iteration_start", "iteration": 0, "max_iterations": self.max_iterations}

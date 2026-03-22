@@ -41,6 +41,9 @@ interface AppState {
   sandboxStatus: SandboxStatus;
   setSandboxStatus: (status: SandboxStatus) => void;
   
+  sandboxId: string | null;
+  setSandboxId: (id: string | null) => void;
+  
   selectedModel: string;
   setSelectedModel: (model: string) => void;
   
@@ -131,6 +134,9 @@ export const useStore = create<AppState>()(
       sandboxStatus: "idle",
       setSandboxStatus: (status) => set({ sandboxStatus: status }),
       
+      sandboxId: null,
+      setSandboxId: (id) => set({ sandboxId: id }),
+      
       selectedModel: "anthropic/claude-3.5-sonnet",
       setSelectedModel: (model) => set({ selectedModel: model }),
       
@@ -148,7 +154,7 @@ export const useStore = create<AppState>()(
             entry.id === id ? { ...entry, ...updates } : entry
           ),
         })),
-      clearChat: () => set({ chatEntries: [], sandboxStatus: "idle" }),
+      clearChat: () => set({ chatEntries: [], sandboxStatus: "idle", sandboxId: null }),
       
       fileTree: null,
       setFileTree: (tree) => set({ fileTree: tree }),
