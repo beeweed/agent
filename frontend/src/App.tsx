@@ -4,10 +4,11 @@ import { useApi } from "@/hooks/useApi";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FilePanel } from "@/components/FilePanel";
 import { ComputerPanel } from "@/components/ComputerPanel";
+import { EmbeddedTerminal } from "@/components/EmbeddedTerminal";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { MemorySidebar } from "@/components/MemorySidebar";
 import { Toaster } from "@/components/ui/sonner";
-import { Monitor, FolderOpen, MessageSquare } from "lucide-react";
+import { Monitor, FolderOpen, MessageSquare, TerminalSquare } from "lucide-react";
 
 // Keepalive interval: 5 minutes (in milliseconds)
 const KEEPALIVE_INTERVAL = 5 * 60 * 1000;
@@ -76,9 +77,9 @@ function App() {
 
         <div 
           data-design-id="right-panel-container"
-          className="flex-1 h-full p-2 md:p-3 lg:p-3.5 pl-0"
+          className="flex-1 h-full p-2 md:p-3 lg:p-3.5 pl-0 flex flex-col gap-2 md:gap-2.5"
         >
-          <div className="h-full rounded-xl md:rounded-2xl lg:rounded-[18px] bg-card shadow-lg border border-border overflow-hidden flex flex-col">
+          <div data-design-id="computer-panel-wrapper" className="flex-1 min-h-0 rounded-xl md:rounded-2xl lg:rounded-[18px] bg-card shadow-lg border border-border overflow-hidden flex flex-col">
             <div 
               data-design-id="right-panel-header"
               className="flex items-center justify-between px-2 md:px-3 lg:px-4 py-2 md:py-2.5 lg:py-3 border-b border-border"
@@ -119,6 +120,10 @@ function App() {
               )}
             </div>
           </div>
+
+          <div data-design-id="terminal-panel-wrapper" className="h-[30%] min-h-[160px] max-h-[320px] rounded-xl md:rounded-2xl lg:rounded-[18px] shadow-lg border border-border overflow-hidden flex-shrink-0">
+            <EmbeddedTerminal />
+          </div>
         </div>
       </div>
 
@@ -131,6 +136,10 @@ function App() {
           ) : mobileTab === "computer" ? (
             <div className="h-full overflow-hidden">
               <ComputerPanel />
+            </div>
+          ) : mobileTab === "terminal" ? (
+            <div className="h-full overflow-hidden">
+              <EmbeddedTerminal />
             </div>
           ) : (
             <div className="h-full overflow-hidden">
@@ -163,6 +172,18 @@ function App() {
           >
             <Monitor className="w-5 h-5 xs:w-6 xs:h-6" />
             <span className="text-[10px] xs:text-xs sm:text-sm font-medium">Computer</span>
+          </button>
+          <button
+            data-design-id="mobile-terminal-tab"
+            onClick={() => setMobileTab("terminal")}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 xs:gap-1 transition-all active:scale-95 ${
+              mobileTab === "terminal"
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground active:text-foreground"
+            }`}
+          >
+            <TerminalSquare className="w-5 h-5 xs:w-6 xs:h-6" />
+            <span className="text-[10px] xs:text-xs sm:text-sm font-medium">Terminal</span>
           </button>
           <button
             data-design-id="mobile-files-tab"

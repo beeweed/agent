@@ -422,6 +422,84 @@
   margin: 0.5rem 0;
 }
 
+/* ============================================ */
+/* XTerm Terminal Styles - Light/Gray Theme     */
+/* ============================================ */
+
+/* XTerm container styling — critical for TUI/fullscreen apps */
+.xterm {
+  padding: 4px;
+  height: 100%;
+}
+.xterm-viewport {
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #c0c0c0 #f0f0f0;
+}
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.xterm-viewport::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-radius: 4px;
+}
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+.xterm-screen {
+  height: 100%;
+}
+
+/* Ensure box drawing characters render correctly */
+.xterm-char-measure-element {
+  display: inline-block !important;
+}
+
+/* Smooth cursor for bar style */
+.xterm-cursor-bar {
+  border-left-width: 2px !important;
+}
+
+/* Better link styling */
+.xterm-underline-1 { text-decoration: underline; }
+.xterm-underline-2 { text-decoration: double underline; }
+.xterm-underline-3 { text-decoration: wavy underline; }
+.xterm-underline-4 { text-decoration: dotted underline; }
+.xterm-underline-5 { text-decoration: dashed underline; }
+
+/* Selection styling - light theme */
+.xterm .xterm-selection div {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Terminal container reset — prevent inherited styles from breaking TUI layout */
+.terminal-container {
+  line-height: normal;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Override xterm-rows to ensure proper character grid alignment */
+.xterm-rows {
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+/* Ensure canvas renders at proper resolution */
+.xterm canvas {
+  image-rendering: optimizeSpeed;
+}
+
+/* Link hover */
+.xterm a:hover {
+  cursor: pointer;
+}
+
 /* Computer Panel - Light theme syntax highlighting */
 [data-design-id="computer-code-area"] .hljs {
   background: transparent !important;
