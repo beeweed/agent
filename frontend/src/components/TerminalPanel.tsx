@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { Sandbox } from "e2b";
 import { useStore } from "@/store/useStore";
+import { terminalSessionManager } from "@/lib/terminalSessionManager";
 import {
   createEnhancedTerminal,
   loadWebGLRenderer,
@@ -168,6 +169,7 @@ export function TerminalPanel() {
   }, [e2bApiKey, sandboxStatus]);
 
   // Connect to sandbox when we have the sandbox ID with retry
+  // Uses the shared session manager to avoid duplicate connections
   useEffect(() => {
     let isMounted = true;
     let retryTimeout: NodeJS.Timeout | null = null;
@@ -184,16 +186,19 @@ export function TerminalPanel() {
       );
 
       try {
-        const sandbox = await Sandbox.connect(sandboxId, {
-          apiKey: e2bApiKey,
-        });
+        // Use the shared session manager for sandbox connection
+        const sandbox = await terminalSessionManager.connectSandbox(sandboxId, e2bApiKey);
 
         if (!isMounted) return;
 
-        sandboxRef.current = sandbox;
-        setIsSandboxConnected(true);
-        setIsConnecting(false);
-        setConnectRetryCount(0);
+        if (sandbox) {
+          sandboxRef.current = sandbox;
+          setIsSandboxConnected(true);
+          setIsConnecting(false);
+          setConnectRetryCount(0);
+        } else {
+          throw new Error("Failed to connect to sandbox");
+        }
       } catch (error: unknown) {
         console.error("Failed to connect to sandbox:", error);
 

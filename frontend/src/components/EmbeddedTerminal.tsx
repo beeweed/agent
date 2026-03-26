@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { Sandbox } from "e2b";
 import { useStore } from "@/store/useStore";
 import { isLongRunningCommand, detectServerStatus, getDetectionSummary } from "@/lib/serverDetection";
-import {
-  createEnhancedTerminal,
-  loadWebGLRenderer,
-} from "@/lib/terminal";
-import type { TerminalAddons } from "@/lib/terminal";
+import { terminalSessionManager } from "@/lib/terminalSessionManager";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -24,6 +18,7 @@ import {
   ChevronUp,
   ChevronDown,
   ExternalLink,
+  Play,
 } from "lucide-react";
 
 interface EmbeddedTerminalProps {
@@ -60,6 +55,8 @@ export function EmbeddedTerminal({
     command,
     "commandId:",
     commandId,
+    "sessionName:",
+    sessionName,
     "isLongRunning:",
     isLongRunningCommand(command)
   );
@@ -73,62 +70,55 @@ export function EmbeddedTerminal({
     "connecting" | "running" | "completed" | "error" | "server_running"
   >("connecting");
   const [sandboxId, setSandboxId] = useState<string | null>(null);
-  const [_isTerminalReady, setIsTerminalReady] = useState(false);
-  const [_capturedOutput, setCapturedOutput] = useState("");
   const [serverUrls, setServerUrls] = useState<string[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing terminal...");
   const isLongRunning = isLongRunningCommand(command);
+  const commandExecutedRef = useRef(false);
+  const initializedRef = useRef(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const outputBufferRef = useRef<string>("");
 
-  // Search state
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const sandboxRef = useRef<Sandbox | null>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const addonsRef = useRef<TerminalAddons | null>(null);
-  const terminalPidRef = useRef<number | null>(null);
-  const outputBufferRef = useRef<string>("");
-  const commandExecutedRef = useRef(false);
-  const initializedRef = useRef(false);
-  const serverDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Search handlers
   const handleSearch = useCallback(() => {
-    if (!addonsRef.current || !searchQuery) return;
-    addonsRef.current.search.findNext(searchQuery, {
+    const session = terminalSessionManager.getSession(sessionName);
+    if (!session || !searchQuery) return;
+    session.addons.search.findNext(searchQuery, {
       caseSensitive: false,
       incremental: true,
     });
-  }, [searchQuery]);
+  }, [searchQuery, sessionName]);
 
   const handleSearchPrev = useCallback(() => {
-    if (!addonsRef.current || !searchQuery) return;
-    addonsRef.current.search.findPrevious(searchQuery);
-  }, [searchQuery]);
+    const session = terminalSessionManager.getSession(sessionName);
+    if (!session || !searchQuery) return;
+    session.addons.search.findPrevious(searchQuery);
+  }, [searchQuery, sessionName]);
 
   const handleClearSearch = useCallback(() => {
-    if (!addonsRef.current) return;
-    addonsRef.current.search.clearDecorations();
+    const session = terminalSessionManager.getSession(sessionName);
+    if (!session) return;
+    session.addons.search.clearDecorations();
     setSearchQuery("");
     setShowSearch(false);
-  }, []);
+  }, [sessionName]);
 
-  // Copy selection
   const handleCopy = useCallback(() => {
-    if (!xtermRef.current) return;
-    const selection = xtermRef.current.getSelection();
+    const session = terminalSessionManager.getSession(sessionName);
+    if (!session) return;
+    const selection = session.xterm.getSelection();
     if (selection) {
       navigator.clipboard.writeText(selection);
     }
-  }, []);
+  }, [sessionName]);
 
-  // Export as HTML
   const handleExport = useCallback(() => {
-    if (!addonsRef.current) return;
-    const html = addonsRef.current.serialize.serializeAsHTML();
+    const session = terminalSessionManager.getSession(sessionName);
+    if (!session) return;
+    const html = session.addons.serialize.serializeAsHTML();
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -136,105 +126,93 @@ export function EmbeddedTerminal({
     a.download = `command-${entryId}.html`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [entryId]);
+  }, [entryId, sessionName]);
 
-  // Fallback timeout function to check for server ready state
-  const checkServerReadyFallback = useCallback(() => {
-    if (outputSubmittedRef.current || !isLongRunning) return;
-
-    const serverStatus = detectServerStatus(command, outputBufferRef.current);
-    const detectionSummary = getDetectionSummary(command, outputBufferRef.current);
-
-    console.log("[SERVER_DETECTION_FALLBACK] Checking with accumulated output...", {
-      outputLength: outputBufferRef.current.length,
-      isReady: serverStatus.isReady,
-      hasPortConflict: serverStatus.hasPortConflict,
-      urls: serverStatus.urls,
-      detectionSummary,
-    });
-
-    // Check for port conflict first
-    if (serverStatus.hasPortConflict && !outputSubmittedRef.current) {
-      console.log("[SERVER_DETECTION_FALLBACK] Port conflict detected!");
+  const submitOutput = useCallback(
+    (output: string, success: boolean, error: string | null, resultStatus: "completed" | "server_running" | "error", urls: string[] = []) => {
+      if (outputSubmittedRef.current) return;
       outputSubmittedRef.current = true;
-      setStatus("error");
+
+      setStatus(resultStatus);
+      if (urls.length > 0) setServerUrls(urls);
+
+      terminalSessionManager.markCommandCompleted(sessionName);
 
       if (commandId) {
+        console.log("[SHELL_OUTPUT] POSTing to backend:", { command_id: commandId, success, api_base: API_BASE });
         fetch(`${API_BASE}/api/shell/output`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             command_id: commandId,
-            output: serverStatus.message,
-            success: false,
-            error: "Port conflict detected. Please use a different port.",
-          }),
-        }).catch(console.error);
-      }
-
-      updateChatEntry(entryId, {
-        shellStatus: "error",
-        shellResult: {
-          success: false,
-          output: serverStatus.message,
-          error: "Port conflict detected",
-          session_name: sessionName,
-          command: command,
-        },
-      });
-      return;
-    }
-
-    if (serverStatus.isReady && !outputSubmittedRef.current) {
-      console.log("[SERVER_DETECTION_FALLBACK] Server detected! Submitting full output with URLs...");
-      outputSubmittedRef.current = true;
-      setStatus("server_running");
-      setServerUrls(serverStatus.urls);
-
-      if (commandId) {
-        console.log("[SHELL_OUTPUT_FALLBACK] POSTing to backend with full output:", {
-          command_id: commandId,
-          urlCount: serverStatus.urls.length,
-          api_base: API_BASE,
-        });
-        fetch(`${API_BASE}/api/shell/output`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            command_id: commandId,
-            output: serverStatus.message,
-            success: true,
-            error: null,
+            output,
+            success,
+            error,
           }),
         })
-          .then((res) => {
-            console.log("[SHELL_OUTPUT_FALLBACK] Response status:", res.status);
-            return res.json();
-          })
-          .then((data) => {
-            console.log("[SHELL_OUTPUT_FALLBACK] Response data:", data);
-          })
-          .catch((err) => {
-            console.error("[SHELL_OUTPUT_FALLBACK] Failed:", err);
-          });
+          .then((res) => res.json())
+          .then((data) => console.log("[SHELL_OUTPUT] Response:", data))
+          .catch((err) => console.error("[SHELL_OUTPUT] Failed:", err));
       }
 
+      const shellStatus = resultStatus === "server_running" ? "server_running" : resultStatus === "error" ? "error" : "completed";
       updateChatEntry(entryId, {
-        shellStatus: "server_running",
+        shellStatus,
         shellResult: {
-          success: true,
-          output: serverStatus.message,
+          success,
+          output,
+          error: error || undefined,
           session_name: sessionName,
-          command: command,
-          urls: serverStatus.urls,
+          command,
+          urls: urls.length > 0 ? urls : undefined,
         },
       });
 
-      fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
-    }
-  }, [command, commandId, entryId, isLongRunning, sessionName, updateChatEntry]);
+      if (onOutputCapture) {
+        onOutputCapture(output);
+      }
 
-  // Fetch sandbox ID from backend with retry logic
+      fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
+    },
+    [command, commandId, entryId, sessionName, updateChatEntry, onOutputCapture]
+  );
+
+  const checkOutput = useCallback(
+    (currentOutput: string) => {
+      if (outputSubmittedRef.current) return;
+
+      if (isLongRunning) {
+        const serverStatus = detectServerStatus(command, currentOutput);
+        const detectionSummary = getDetectionSummary(command, currentOutput);
+
+        console.log("[SERVER_DETECTION]", {
+          isReady: serverStatus.isReady,
+          hasPortConflict: serverStatus.hasPortConflict,
+          urls: serverStatus.urls,
+          detectionSummary,
+        });
+
+        if (serverStatus.hasPortConflict) {
+          submitOutput(serverStatus.message, false, "Port conflict detected. Please use a different port.", "error");
+          return;
+        }
+
+        if (serverStatus.isReady) {
+          submitOutput(serverStatus.message, true, null, "server_running", serverStatus.urls);
+          return;
+        }
+      }
+
+      const promptPatterns = [/\$\s*$/, />\s*$/, /#\s*$/, /\]\s*$/, /~\]\$/];
+      const hasPrompt = promptPatterns.some((pattern) => pattern.test(currentOutput));
+
+      if (hasPrompt && currentOutput.trim().length > 0 && !isLongRunning) {
+        submitOutput(currentOutput, true, null, "completed");
+      }
+    },
+    [command, isLongRunning, submitOutput]
+  );
+
   useEffect(() => {
     let isMounted = true;
 
@@ -254,39 +232,27 @@ export function EmbeddedTerminal({
         if (!isMounted) return;
 
         if (data.sandbox_id && data.is_running) {
-          console.log("[EmbeddedTerminal] Sandbox connected:", data.sandbox_id);
+          console.log("[EmbeddedTerminal] Sandbox found:", data.sandbox_id);
           setSandboxId(data.sandbox_id);
           setRetryCount(0);
         } else if (attempt < MAX_RETRIES - 1) {
-          console.log("[EmbeddedTerminal] Sandbox not ready, retrying in", RETRY_DELAY, "ms");
           setRetryCount(attempt + 1);
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSandboxId(attempt + 1);
-          }, RETRY_DELAY);
+          retryTimeoutRef.current = setTimeout(() => fetchSandboxId(attempt + 1), RETRY_DELAY);
         } else {
-          console.log("[EmbeddedTerminal] Sandbox not ready after retries, will keep polling...");
           setLoadingMessage("Waiting for sandbox to be ready...");
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSandboxId(0);
-          }, RETRY_DELAY * 2);
+          retryTimeoutRef.current = setTimeout(() => fetchSandboxId(0), RETRY_DELAY * 2);
         }
       } catch (error) {
         console.error("Failed to fetch sandbox status:", error);
-
         if (!isMounted) return;
 
         if (attempt < MAX_RETRIES - 1) {
-          console.log("[EmbeddedTerminal] Network error, retrying...");
           setRetryCount(attempt + 1);
           setLoadingMessage(`Connection failed, retrying... (${attempt + 1}/${MAX_RETRIES})`);
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSandboxId(attempt + 1);
-          }, RETRY_DELAY);
+          retryTimeoutRef.current = setTimeout(() => fetchSandboxId(attempt + 1), RETRY_DELAY);
         } else {
           setLoadingMessage("Connection issues, still trying...");
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSandboxId(0);
-          }, RETRY_DELAY * 3);
+          retryTimeoutRef.current = setTimeout(() => fetchSandboxId(0), RETRY_DELAY * 3);
         }
       }
     };
@@ -299,13 +265,10 @@ export function EmbeddedTerminal({
 
     return () => {
       isMounted = false;
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
   }, [e2bApiKey, sandboxStatus]);
 
-  // Connect to sandbox and initialize terminal
   useEffect(() => {
     if (!sandboxId || !e2bApiKey || initializedRef.current) return;
     initializedRef.current = true;
@@ -318,276 +281,90 @@ export function EmbeddedTerminal({
       );
 
       try {
-        // Connect to sandbox with retry
-        console.log("[EmbeddedTerminal] Connecting to sandbox:", sandboxId);
-        const sandbox = await Sandbox.connect(sandboxId, {
-          apiKey: e2bApiKey,
-        });
-        sandboxRef.current = sandbox;
-        console.log("[EmbeddedTerminal] Sandbox connected successfully");
-
-        // Wait for container to be ready with retry
         if (!terminalRef.current) {
-          console.log("[EmbeddedTerminal] Terminal ref not ready, waiting...");
           if (attempt < MAX_RETRIES - 1) {
             setLoadingMessage("Waiting for terminal container...");
             await new Promise((resolve) => setTimeout(resolve, 500));
-            if (terminalRef.current) {
-              console.log("[EmbeddedTerminal] Terminal ref now ready");
-            } else {
+            if (!terminalRef.current) {
+              initializedRef.current = false;
               retryTimeoutRef.current = setTimeout(() => initTerminal(attempt + 1), RETRY_DELAY);
               return;
             }
           } else {
-            setLoadingMessage("Preparing terminal...");
+            initializedRef.current = false;
             retryTimeoutRef.current = setTimeout(() => initTerminal(0), RETRY_DELAY);
             return;
           }
         }
 
-        // Create enhanced terminal with all addons
-        const { terminal: xterm, addons } = createEnhancedTerminal(
-          {
-            fontSize: 13,
-            scrollback: 5000,
-          },
-          "github"
+        const existingSession = terminalSessionManager.getSession(sessionName);
+
+        if (existingSession) {
+          console.log("[EmbeddedTerminal] Reusing existing session:", sessionName);
+
+          terminalSessionManager.mountTerminalToContainer(sessionName, terminalRef.current!);
+
+          setStatus("running");
+
+          outputBufferRef.current = "";
+          outputSubmittedRef.current = false;
+
+          const listenerId = `embedded-${entryId}`;
+          terminalSessionManager.addOutputListener(sessionName, listenerId, (text: string) => {
+            outputBufferRef.current += text;
+            if (commandExecutedRef.current) {
+              checkOutput(outputBufferRef.current);
+            }
+          });
+
+          if (!commandExecutedRef.current) {
+            commandExecutedRef.current = true;
+            await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
+
+            if (isLongRunning) {
+              setTimeout(() => checkOutput(outputBufferRef.current), 2000);
+              setTimeout(() => checkOutput(outputBufferRef.current), 5000);
+              setTimeout(() => checkOutput(outputBufferRef.current), 10000);
+            }
+          }
+
+          return;
+        }
+
+        console.log("[EmbeddedTerminal] Creating new session:", sessionName);
+        const session = await terminalSessionManager.getOrCreateSession(
+          sessionName,
+          sandboxId,
+          e2bApiKey,
+          terminalRef.current!
         );
 
-        // Open terminal in DOM
-        xterm.open(terminalRef.current);
+        if (!session) {
+          throw new Error("Failed to create terminal session");
+        }
 
-        // Load WebGL renderer for better performance
-        loadWebGLRenderer(xterm, addons);
-
-        xtermRef.current = xterm;
-        addonsRef.current = addons;
-
-        // Fit terminal to container
-        setTimeout(() => {
-          addons.fit.fit();
-        }, 50);
-
-        // Create PTY terminal
-        const cols = xterm.cols;
-        const rows = xterm.rows;
-
-        const pty = await sandbox.pty.create({
-          cols,
-          rows,
-          onData: (data: Uint8Array) => {
-            const text = new TextDecoder().decode(data);
-            xterm.write(data);
-
-            // Capture output for LLM
-            outputBufferRef.current += text;
-            setCapturedOutput(outputBufferRef.current);
-
-            // Only check for completion after command was executed
-            if (commandExecutedRef.current) {
-              // Check for long-running server commands first
-              if (isLongRunningCommand(command)) {
-                const serverStatus = detectServerStatus(command, outputBufferRef.current);
-                const detectionSummary = getDetectionSummary(command, outputBufferRef.current);
-
-                console.log("[SERVER_DETECTION] Checking output for server ready state...");
-                console.log(
-                  "[SERVER_DETECTION] isReady:",
-                  serverStatus.isReady,
-                  "hasPortConflict:",
-                  serverStatus.hasPortConflict,
-                  "urls:",
-                  serverStatus.urls
-                );
-                console.log("[SERVER_DETECTION] Summary:", detectionSummary);
-
-                // Check for port conflict FIRST
-                if (serverStatus.hasPortConflict && !outputSubmittedRef.current) {
-                  console.log("[SERVER_DETECTION] Port conflict detected! Notifying LLM...");
-                  outputSubmittedRef.current = true;
-
-                  setStatus("error");
-
-                  if (commandId) {
-                    console.log("[SHELL_OUTPUT] POSTing port conflict to backend");
-                    fetch(`${API_BASE}/api/shell/output`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        command_id: commandId,
-                        output: serverStatus.message,
-                        success: false,
-                        error:
-                          "Port conflict detected. The port is already in use. Please try a different port.",
-                      }),
-                    }).catch(console.error);
-                  }
-
-                  updateChatEntry(entryId, {
-                    shellStatus: "error",
-                    shellResult: {
-                      success: false,
-                      output: serverStatus.message,
-                      error: "Port conflict detected",
-                      session_name: sessionName,
-                      command: command,
-                    },
-                  });
-
-                  return;
-                }
-
-                if (serverStatus.isReady && !outputSubmittedRef.current) {
-                  console.log(
-                    "[SERVER_DETECTION] Server detected as ready! Submitting full output with URLs..."
-                  );
-                  outputSubmittedRef.current = true;
-
-                  setStatus("server_running");
-                  setServerUrls(serverStatus.urls);
-
-                  const capturedOutput = outputBufferRef.current;
-
-                  if (commandId) {
-                    console.log("[SHELL_OUTPUT] POSTing server ready output to backend:", {
-                      command_id: commandId,
-                      urlCount: serverStatus.urls.length,
-                      api_base: API_BASE,
-                    });
-                    fetch(`${API_BASE}/api/shell/output`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        command_id: commandId,
-                        output: serverStatus.message,
-                        success: true,
-                        error: null,
-                      }),
-                    })
-                      .then((res) => {
-                        console.log("[SHELL_OUTPUT] Backend response status:", res.status);
-                        return res.json();
-                      })
-                      .then((data) => {
-                        console.log("[SHELL_OUTPUT] Backend response data:", data);
-                      })
-                      .catch((err) => {
-                        console.error("[SHELL_OUTPUT] Failed to submit server ready output:", err);
-                      });
-                  }
-
-                  updateChatEntry(entryId, {
-                    shellStatus: "server_running",
-                    shellResult: {
-                      success: true,
-                      output: serverStatus.message,
-                      session_name: sessionName,
-                      command: command,
-                      urls: serverStatus.urls,
-                    },
-                  });
-
-                  if (onOutputCapture) {
-                    onOutputCapture(capturedOutput);
-                  }
-
-                  fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
-
-                  return;
-                }
-              }
-
-              // Check for command completion (prompt patterns) for non-long-running commands
-              const promptPatterns = [/\$\s*$/, />\s*$/, /#\s*$/, /\]\s*$/, /~\]\$/];
-
-              const hasPrompt = promptPatterns.some((pattern) =>
-                pattern.test(outputBufferRef.current)
-              );
-
-              if (hasPrompt && outputBufferRef.current.trim().length > 0) {
-                if (outputSubmittedRef.current) return;
-                outputSubmittedRef.current = true;
-
-                setStatus("completed");
-
-                const capturedOutput = outputBufferRef.current;
-
-                if (commandId) {
-                  fetch(`${API_BASE}/api/shell/output`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      command_id: commandId,
-                      output: capturedOutput,
-                      success: true,
-                      error: null,
-                    }),
-                  }).catch((err) => {
-                    console.error("[SHELL_OUTPUT] Failed to submit output:", err);
-                  });
-                }
-
-                updateChatEntry(entryId, {
-                  shellStatus: "completed",
-                  shellResult: {
-                    success: true,
-                    output: capturedOutput,
-                    session_name: sessionName,
-                    command: command,
-                  },
-                });
-
-                if (onOutputCapture) {
-                  onOutputCapture(capturedOutput);
-                }
-
-                fetch(`${API_BASE}/api/files/refresh`, { method: "POST" }).catch(console.error);
-              }
-            }
-          },
-          timeoutMs: 0,
-        });
-
-        terminalPidRef.current = pty.pid;
-        setIsTerminalReady(true);
         setStatus("running");
 
-        // Allow user input
-        xterm.onData(async (data) => {
-          if (sandboxRef.current && terminalPidRef.current) {
-            await sandboxRef.current.pty.sendInput(
-              terminalPidRef.current,
-              new TextEncoder().encode(data)
-            );
+        outputBufferRef.current = "";
+        outputSubmittedRef.current = false;
+
+        const listenerId = `embedded-${entryId}`;
+        terminalSessionManager.addOutputListener(sessionName, listenerId, (text: string) => {
+          outputBufferRef.current += text;
+          if (commandExecutedRef.current) {
+            checkOutput(outputBufferRef.current);
           }
         });
 
-        // Handle resize
-        xterm.onResize(async ({ cols, rows }) => {
-          if (sandboxRef.current && terminalPidRef.current) {
-            try {
-              await sandboxRef.current.pty.resize(terminalPidRef.current, { cols, rows });
-            } catch (err) {
-              console.error("[EmbeddedTerminal] Failed to resize PTY:", err);
-            }
-          }
-        });
-
-        // Execute the command after a brief delay
         setTimeout(async () => {
-          if (sandboxRef.current && terminalPidRef.current && !commandExecutedRef.current) {
+          if (!commandExecutedRef.current) {
             commandExecutedRef.current = true;
-            await sandboxRef.current.pty.sendInput(
-              terminalPidRef.current,
-              new TextEncoder().encode(command + "\n")
-            );
+            await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
 
-            // For long-running commands, set up fallback detection timers
             if (isLongRunning) {
-              console.log("[SERVER_DETECTION] Setting up fallback timers for long-running command");
-              setTimeout(checkServerReadyFallback, 2000);
-              setTimeout(checkServerReadyFallback, 5000);
-              setTimeout(checkServerReadyFallback, 10000);
+              setTimeout(() => checkOutput(outputBufferRef.current), 2000);
+              setTimeout(() => checkOutput(outputBufferRef.current), 5000);
+              setTimeout(() => checkOutput(outputBufferRef.current), 10000);
             }
           }
         }, 300);
@@ -597,7 +374,6 @@ export function EmbeddedTerminal({
         const errorMessage = error instanceof Error ? error.message : "Failed to initialize terminal";
 
         if (attempt < MAX_RETRIES - 1) {
-          console.log("[EmbeddedTerminal] Retrying terminal initialization...");
           setLoadingMessage(`Terminal initialization failed, retrying... (${attempt + 1}/${MAX_RETRIES})`);
           setRetryCount(attempt + 1);
           initializedRef.current = false;
@@ -606,7 +382,6 @@ export function EmbeddedTerminal({
         }
 
         if (attempt >= MAX_RETRIES - 1) {
-          console.log("[EmbeddedTerminal] Max retries reached, will keep trying...");
           setLoadingMessage("Having trouble connecting... Still trying...");
           initializedRef.current = false;
           retryTimeoutRef.current = setTimeout(() => initTerminal(0), RETRY_DELAY * 2);
@@ -616,55 +391,17 @@ export function EmbeddedTerminal({
         setStatus("error");
 
         if (commandId && !outputSubmittedRef.current) {
-          outputSubmittedRef.current = true;
-          fetch(`${API_BASE}/api/shell/output`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              command_id: commandId,
-              output: "",
-              success: false,
-              error: errorMessage,
-            }),
-          }).catch(console.error);
+          submitOutput("", false, errorMessage, "error");
         }
-
-        updateChatEntry(entryId, {
-          shellStatus: "error",
-          shellResult: {
-            success: false,
-            error: errorMessage,
-            session_name: sessionName,
-            command: command,
-          },
-        });
       }
     };
 
     initTerminal(0);
 
     return () => {
-      // Cleanup
-      if (addonsRef.current) {
-        if (addonsRef.current.webgl) {
-          addonsRef.current.webgl.dispose();
-        }
-        if (addonsRef.current.canvas) {
-          addonsRef.current.canvas.dispose();
-        }
-      }
-      if (xtermRef.current) {
-        xtermRef.current.dispose();
-      }
-      if (sandboxRef.current && terminalPidRef.current) {
-        sandboxRef.current.pty.kill(terminalPidRef.current).catch(console.error);
-      }
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-      if (serverDetectionTimeoutRef.current) {
-        clearTimeout(serverDetectionTimeoutRef.current);
-      }
+      const listenerId = `embedded-${entryId}`;
+      terminalSessionManager.removeOutputListener(sessionName, listenerId);
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
   }, [
     sandboxId,
@@ -676,37 +413,30 @@ export function EmbeddedTerminal({
     updateChatEntry,
     onOutputCapture,
     isLongRunning,
-    checkServerReadyFallback,
+    checkOutput,
+    submitOutput,
   ]);
 
-  // Handle window resize
   useEffect(() => {
-    const handleResize = () => {
-      if (addonsRef.current && xtermRef.current && sandboxRef.current && terminalPidRef.current) {
-        addonsRef.current.fit.fit();
-        sandboxRef.current.pty
-          .resize(terminalPidRef.current, {
-            cols: xtermRef.current.cols,
-            rows: xtermRef.current.rows,
-          })
-          .catch(console.error);
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Re-fit on expand/collapse
-  useEffect(() => {
-    if (addonsRef.current) {
+    const session = terminalSessionManager.getSession(sessionName);
+    if (session) {
       setTimeout(() => {
-        addonsRef.current?.fit.fit();
+        session.addons.fit.fit();
       }, 100);
     }
-  }, [isExpanded]);
+  }, [isExpanded, sessionName]);
 
-  // Keyboard shortcuts
+  useEffect(() => {
+    const handleResize = () => {
+      const session = terminalSessionManager.getSession(sessionName);
+      if (session) {
+        session.addons.fit.fit();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [sessionName]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
@@ -744,7 +474,6 @@ export function EmbeddedTerminal({
         data-design-id={`embedded-terminal-loading-${entryId}`}
         className="rounded-lg bg-[#0d1117] border border-[#30363d] overflow-hidden"
       >
-        {/* Header - preloaded */}
         <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d]">
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />
@@ -756,7 +485,6 @@ export function EmbeddedTerminal({
           </span>
         </div>
 
-        {/* Command display - preloaded */}
         <div className="px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] font-mono text-xs">
           <span className="text-cyan-400">user@e2b</span>
           <span className="text-gray-500">:</span>
@@ -765,7 +493,6 @@ export function EmbeddedTerminal({
           <span className="text-gray-100">{command}</span>
         </div>
 
-        {/* Loading content */}
         <div className="p-8 flex flex-col items-center justify-center" style={{ minHeight: "200px" }}>
           <div className="relative mb-4">
             <div className="w-12 h-12 rounded-full border-2 border-[#30363d] border-t-green-400 animate-spin" />
@@ -799,19 +526,28 @@ export function EmbeddedTerminal({
         isExpanded ? "fixed inset-4 z-50" : ""
       }`}
     >
-      {/* Header */}
       <div
         data-design-id={`embedded-terminal-header-${entryId}`}
         className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d]"
       >
         <div className="flex items-center gap-2">
           {status === "connecting" && <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />}
-          {status === "running" && <Loader2 className="w-4 h-4 text-green-400 animate-spin" />}
+          {status === "running" && (
+            <div className="relative">
+              <Play className="w-4 h-4 text-green-400 fill-green-400" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 animate-ping" />
+            </div>
+          )}
           {status === "completed" && <Check className="w-4 h-4 text-green-400" />}
           {status === "server_running" && <Server className="w-4 h-4 text-cyan-400" />}
           {status === "error" && <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />}
           <TerminalSquare className="w-4 h-4 text-green-400" />
           <span className="text-xs font-mono text-gray-400">{sessionName}</span>
+          {terminalSessionManager.hasSession(sessionName) && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono">
+              reused
+            </span>
+          )}
           {status === "server_running" && serverUrls.length > 0 && (
             <div className="flex items-center gap-1 ml-2">
               {serverUrls.slice(0, 2).map((url, idx) => (
@@ -840,7 +576,6 @@ export function EmbeddedTerminal({
             </span>
           )}
 
-          {/* Search toggle */}
           <button
             onClick={() => {
               setShowSearch(!showSearch);
@@ -856,7 +591,6 @@ export function EmbeddedTerminal({
             <Search className="w-3.5 h-3.5" />
           </button>
 
-          {/* Copy */}
           <button
             onClick={handleCopy}
             className="p-1 text-gray-400 hover:text-white rounded hover:bg-[#30363d] transition-colors"
@@ -865,7 +599,6 @@ export function EmbeddedTerminal({
             <Copy className="w-3.5 h-3.5" />
           </button>
 
-          {/* Export */}
           <button
             onClick={handleExport}
             className="p-1 text-gray-400 hover:text-white rounded hover:bg-[#30363d] transition-colors"
@@ -907,7 +640,6 @@ export function EmbeddedTerminal({
         </div>
       </div>
 
-      {/* Search bar */}
       {showSearch && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[#161b22] border-b border-[#30363d]">
           <input
@@ -951,7 +683,6 @@ export function EmbeddedTerminal({
         </div>
       )}
 
-      {/* Command display */}
       <div
         data-design-id={`embedded-terminal-command-${entryId}`}
         className="px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] font-mono text-xs"
@@ -963,7 +694,6 @@ export function EmbeddedTerminal({
         <span className="text-gray-100">{command}</span>
       </div>
 
-      {/* Terminal */}
       <div
         ref={terminalRef}
         data-design-id={`embedded-terminal-content-${entryId}`}
@@ -974,12 +704,20 @@ export function EmbeddedTerminal({
         }}
       />
 
-      {/* Status bar */}
       <div className="h-5 bg-[#161b22] border-t border-[#30363d] flex items-center justify-between px-3 text-[10px] text-gray-500">
-        <span>WebGL Accelerated • Unicode 11 • Image Support</span>
+        <span>
+          {status === "running" && (
+            <span className="text-green-400 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Command executing...
+            </span>
+          )}
+          {status !== "running" && "WebGL Accelerated • Unicode 11 • Image Support"}
+        </span>
         <span>
           {status === "completed" && `${outputBufferRef.current.split("\n").length} lines`}
           {status === "server_running" && "Live"}
+          {status === "running" && "Output streaming..."}
         </span>
       </div>
     </div>
