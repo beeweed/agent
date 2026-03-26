@@ -6,8 +6,8 @@ import { isLongRunningCommand, detectServerStatus, getDetectionSummary } from "@
 import {
   createEnhancedTerminal,
   loadWebGLRenderer,
-  TerminalAddons,
 } from "@/lib/terminal";
+import type { TerminalAddons } from "@/lib/terminal";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -350,7 +350,6 @@ export function EmbeddedTerminal({
           {
             fontSize: 13,
             scrollback: 5000,
-            rows: 14,
           },
           "github"
         );
@@ -546,7 +545,7 @@ export function EmbeddedTerminal({
               }
             }
           },
-          timeout: 0,
+          timeoutMs: 0,
         });
 
         terminalPidRef.current = pty.pid;

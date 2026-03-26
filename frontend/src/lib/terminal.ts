@@ -1,10 +1,12 @@
-import { Terminal as XTerm, ITerminalOptions, ITheme } from "@xterm/xterm";
+import { Terminal as XTerm } from "@xterm/xterm";
+import type { ITerminalOptions, ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { ImageAddon, IImageAddonOptions } from "@xterm/addon-image";
+import { ImageAddon } from "@xterm/addon-image";
+import type { IImageAddonOptions } from "@xterm/addon-image";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { CanvasAddon } from "@xterm/addon-canvas";
@@ -240,7 +242,6 @@ export const defaultTerminalOptions: ITerminalOptions = {
   scrollback: 10000,
   scrollSensitivity: 1,
   fastScrollSensitivity: 5,
-  fastScrollModifier: "alt",
   smoothScrollDuration: 125,
   macOptionIsMeta: true,
   macOptionClickForcesSelection: true,
@@ -250,13 +251,8 @@ export const defaultTerminalOptions: ITerminalOptions = {
   altClickMovesCursor: true,
   convertEol: false,
   screenReaderMode: false,
-  windowsMode: false,
-  windowsPty: undefined,
-  wordSeparator: " ()[]{}',\"`",
-  ignoreBracketedPasteMode: false,
   drawBoldTextInBrightColors: true,
   customGlyphs: true,
-  rescaleOverlappingGlyphs: true,
 };
 
 // Image addon options for inline images (like sixel, iTerm2 inline images)
@@ -298,36 +294,11 @@ export function createEnhancedTerminal(
 
   // Initialize all addons
   const fit = new FitAddon();
-  const webLinks = new WebLinksAddon((event, uri) => {
+  const webLinks = new WebLinksAddon((_event, uri) => {
     // Open links in new tab
     window.open(uri, "_blank", "noopener,noreferrer");
   }, {
     urlRegex: /https?:\/\/[^\s'"<>]+/,
-    hover: (event, text, _location) => {
-      // Show tooltip on hover
-      const tooltip = document.createElement("div");
-      tooltip.className = "terminal-link-tooltip";
-      tooltip.textContent = text;
-      tooltip.style.cssText = `
-        position: fixed;
-        left: ${event.clientX + 10}px;
-        top: ${event.clientY + 10}px;
-        background: #333;
-        color: #fff;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
-        z-index: 10000;
-        pointer-events: none;
-      `;
-      document.body.appendChild(tooltip);
-      return tooltip;
-    },
-    leave: (_event, element) => {
-      if (element) {
-        element.remove();
-      }
-    },
   });
   const search = new SearchAddon();
   const unicode11 = new Unicode11Addon();
@@ -427,22 +398,11 @@ export function searchInTerminal(
   query: string,
   options: SearchOptions = {}
 ): boolean {
-  const decorations = {
-    matchBackground: "#555555",
-    matchBorder: "#FFFF00",
-    matchOverviewRuler: "#FFFF00",
-    activeMatchBackground: "#FFFF00",
-    activeMatchBorder: "#FF0000",
-    activeMatchColorOverviewRuler: "#FF0000",
-    ...options.decorations,
-  };
-
   return searchAddon.findNext(query, {
     regex: options.regex || false,
     wholeWord: options.wholeWord || false,
     caseSensitive: options.caseSensitive || false,
-    incremental: options.incremental || true,
-    decorations,
+    incremental: options.incremental !== false,
   });
 }
 
@@ -455,7 +415,6 @@ export function searchPrevious(
     regex: options.regex || false,
     wholeWord: options.wholeWord || false,
     caseSensitive: options.caseSensitive || false,
-    decorations: options.decorations,
   });
 }
 

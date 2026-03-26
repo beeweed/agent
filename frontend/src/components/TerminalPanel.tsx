@@ -12,9 +12,9 @@ import {
   searchPrevious,
   clearSearch,
   serializeTerminalAsHTML,
-  TerminalAddons,
   ANSI,
 } from "@/lib/terminal";
+import type { TerminalAddons } from "@/lib/terminal";
 import "@xterm/xterm/css/xterm.css";
 import {
   TerminalSquare,
@@ -252,7 +252,7 @@ export function TerminalPanel() {
               terminalInfo.dataCallback(data);
             }
           },
-          timeout: 0,
+          timeoutMs: 0,
         });
 
         terminalsRef.current.set(terminalId, {
