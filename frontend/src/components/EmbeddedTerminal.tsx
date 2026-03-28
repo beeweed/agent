@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { isLongRunningCommand, detectServerStatus, getDetectionSummary } from "@/lib/serverDetection";
 import { terminalSessionManager } from "@/lib/terminalSessionManager";
 import "@xterm/xterm/css/xterm.css";
 import {
@@ -9,7 +8,6 @@ import {
   Check,
   Maximize2,
   Minimize2,
-  Server,
   RefreshCw,
   Search,
   X,
@@ -17,7 +15,6 @@ import {
   Download,
   ChevronUp,
   ChevronDown,
-  ExternalLink,
   Play,
 } from "lucide-react";
 
@@ -56,9 +53,7 @@ export function EmbeddedTerminal({
     "commandId:",
     commandId,
     "sessionName:",
-    sessionName,
-    "isLongRunning:",
-    isLongRunningCommand(command)
+    sessionName
   );
 
   const { e2bApiKey, sandboxStatus, updateChatEntry } = useStore();
@@ -67,13 +62,11 @@ export function EmbeddedTerminal({
   const terminalRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [status, setStatus] = useState<
-    "connecting" | "running" | "completed" | "error" | "server_running"
+    "connecting" | "running" | "completed" | "error"
   >("connecting");
   const [sandboxId, setSandboxId] = useState<string | null>(null);
-  const [serverUrls, setServerUrls] = useState<string[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing terminal...");
-  const isLongRunning = isLongRunningCommand(command);
   const commandExecutedRef = useRef(false);
   const initializedRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -129,12 +122,11 @@ export function EmbeddedTerminal({
   }, [entryId, sessionName]);
 
   const submitOutput = useCallback(
-    (output: string, success: boolean, error: string | null, resultStatus: "completed" | "server_running" | "error", urls: string[] = []) => {
+    (output: string, success: boolean, error: string | null, resultStatus: "completed" | "error") => {
       if (outputSubmittedRef.current) return;
       outputSubmittedRef.current = true;
 
       setStatus(resultStatus);
-      if (urls.length > 0) setServerUrls(urls);
 
       terminalSessionManager.markCommandCompleted(sessionName);
 
@@ -155,7 +147,7 @@ export function EmbeddedTerminal({
           .catch((err) => console.error("[SHELL_OUTPUT] Failed:", err));
       }
 
-      const shellStatus = resultStatus === "server_running" ? "server_running" : resultStatus === "error" ? "error" : "completed";
+      const shellStatus = resultStatus === "error" ? "error" : "completed";
       updateChatEntry(entryId, {
         shellStatus,
         shellResult: {
@@ -164,7 +156,6 @@ export function EmbeddedTerminal({
           error: error || undefined,
           session_name: sessionName,
           command,
-          urls: urls.length > 0 ? urls : undefined,
         },
       });
 
@@ -181,36 +172,14 @@ export function EmbeddedTerminal({
     (currentOutput: string) => {
       if (outputSubmittedRef.current) return;
 
-      if (isLongRunning) {
-        const serverStatus = detectServerStatus(command, currentOutput);
-        const detectionSummary = getDetectionSummary(command, currentOutput);
-
-        console.log("[SERVER_DETECTION]", {
-          isReady: serverStatus.isReady,
-          hasPortConflict: serverStatus.hasPortConflict,
-          urls: serverStatus.urls,
-          detectionSummary,
-        });
-
-        if (serverStatus.hasPortConflict) {
-          submitOutput(serverStatus.message, false, "Port conflict detected. Please use a different port.", "error");
-          return;
-        }
-
-        if (serverStatus.isReady) {
-          submitOutput(serverStatus.message, true, null, "server_running", serverStatus.urls);
-          return;
-        }
-      }
-
       const promptPatterns = [/\$\s*$/, />\s*$/, /#\s*$/, /\]\s*$/, /~\]\$/];
       const hasPrompt = promptPatterns.some((pattern) => pattern.test(currentOutput));
 
-      if (hasPrompt && currentOutput.trim().length > 0 && !isLongRunning) {
+      if (hasPrompt && currentOutput.trim().length > 0) {
         submitOutput(currentOutput, true, null, "completed");
       }
     },
-    [command, isLongRunning, submitOutput]
+    [submitOutput]
   );
 
   useEffect(() => {
@@ -320,12 +289,6 @@ export function EmbeddedTerminal({
           if (!commandExecutedRef.current) {
             commandExecutedRef.current = true;
             await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
-
-            if (isLongRunning) {
-              setTimeout(() => checkOutput(outputBufferRef.current), 2000);
-              setTimeout(() => checkOutput(outputBufferRef.current), 5000);
-              setTimeout(() => checkOutput(outputBufferRef.current), 10000);
-            }
           }
 
           return;
@@ -360,12 +323,6 @@ export function EmbeddedTerminal({
           if (!commandExecutedRef.current) {
             commandExecutedRef.current = true;
             await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
-
-            if (isLongRunning) {
-              setTimeout(() => checkOutput(outputBufferRef.current), 2000);
-              setTimeout(() => checkOutput(outputBufferRef.current), 5000);
-              setTimeout(() => checkOutput(outputBufferRef.current), 10000);
-            }
           }
         }, 300);
       } catch (error) {
@@ -412,7 +369,6 @@ export function EmbeddedTerminal({
     commandId,
     updateChatEntry,
     onOutputCapture,
-    isLongRunning,
     checkOutput,
     submitOutput,
   ]);
@@ -539,7 +495,6 @@ export function EmbeddedTerminal({
             </div>
           )}
           {status === "completed" && <Check className="w-4 h-4 text-green-400" />}
-          {status === "server_running" && <Server className="w-4 h-4 text-cyan-400" />}
           {status === "error" && <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />}
           <TerminalSquare className="w-4 h-4 text-green-400" />
           <span className="text-xs font-mono text-gray-400">{sessionName}</span>
@@ -548,25 +503,7 @@ export function EmbeddedTerminal({
               reused
             </span>
           )}
-          {status === "server_running" && serverUrls.length > 0 && (
-            <div className="flex items-center gap-1 ml-2">
-              {serverUrls.slice(0, 2).map((url, idx) => (
-                <a
-                  key={idx}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30 transition-colors font-mono flex items-center gap-1"
-                >
-                  <ExternalLink size={10} />
-                  {new URL(url).hostname.split(".")[0]}
-                </a>
-              ))}
-              {serverUrls.length > 2 && (
-                <span className="text-[10px] text-cyan-400">+{serverUrls.length - 2}</span>
-              )}
-            </div>
-          )}
+          
         </div>
 
         <div className="flex items-center gap-1">
@@ -615,8 +552,6 @@ export function EmbeddedTerminal({
                 ? "bg-green-500/20 text-green-400 animate-pulse"
                 : status === "completed"
                 ? "bg-green-500/20 text-green-400"
-                : status === "server_running"
-                ? "bg-cyan-500/20 text-cyan-400"
                 : "bg-yellow-500/20 text-yellow-400"
             }`}
           >
@@ -626,8 +561,6 @@ export function EmbeddedTerminal({
               ? "Running..."
               : status === "completed"
               ? "Completed"
-              : status === "server_running"
-              ? "Server Running"
               : "Reconnecting..."}
           </span>
 
@@ -716,7 +649,6 @@ export function EmbeddedTerminal({
         </span>
         <span>
           {status === "completed" && `${outputBufferRef.current.split("\n").length} lines`}
-          {status === "server_running" && "Live"}
           {status === "running" && "Output streaming..."}
         </span>
       </div>

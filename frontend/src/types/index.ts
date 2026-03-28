@@ -64,8 +64,7 @@ export interface ShellResult {
   session_name?: string;
   command?: string;
   error?: string;
-  urls?: string[];  // Extracted HTTP/HTTPS URLs (localhost, IPs, domains, etc.)
-  hasPortConflict?: boolean;  // True if a real port conflict was detected
+  
 }
 
 export interface ReplaceInFileResult {
@@ -212,7 +211,7 @@ export interface ChatEntry {
   deleteStrResult?: DeleteStrFromFileResult;
   shellCommand?: string;
   shellSessionName?: string;
-  shellStatus?: "running" | "completed" | "error" | "server_running";
+  shellStatus?: "running" | "completed" | "error";
   shellCommandId?: string;  // Used to POST output back to backend
   timestamp: Date;
   isStreaming?: boolean;
