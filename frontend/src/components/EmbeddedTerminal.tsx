@@ -27,6 +27,8 @@ interface EmbeddedTerminalProps {
 }
 
 const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, "");
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
@@ -39,6 +41,9 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 2000;
+
+// Global set to prevent duplicate output submissions across component remounts
+const _submittedOutputCommandIds = new Set<string>();
 
 export function EmbeddedTerminal({
   command,
@@ -67,7 +72,9 @@ export function EmbeddedTerminal({
   const [sandboxId, setSandboxId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing terminal...");
-  const commandExecutedRef = useRef(false);
+  const commandExecutedRef = useRef(
+    commandId ? terminalSessionManager.hasExecutedCommand(commandId) : false
+  );
   const initializedRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const outputBufferRef = useRef<string>("");
@@ -124,7 +131,19 @@ export function EmbeddedTerminal({
   const submitOutput = useCallback(
     (output: string, success: boolean, error: string | null, resultStatus: "completed" | "error") => {
       if (outputSubmittedRef.current) return;
+      
+      // Global dedup: prevent duplicate POSTs for the same commandId across remounts
+      if (commandId && _submittedOutputCommandIds.has(commandId)) {
+        console.warn("[SHELL_OUTPUT] Already submitted for commandId:", commandId, "— skipping");
+        outputSubmittedRef.current = true;
+        setStatus(resultStatus);
+        return;
+      }
+      
       outputSubmittedRef.current = true;
+      if (commandId) {
+        _submittedOutputCommandIds.add(commandId);
+      }
 
       setStatus(resultStatus);
 
@@ -240,6 +259,16 @@ export function EmbeddedTerminal({
 
   useEffect(() => {
     if (!sandboxId || !e2bApiKey || initializedRef.current) return;
+    
+    // If this commandId was already fully executed globally (across remounts), skip init
+    if (commandId && terminalSessionManager.hasExecutedCommand(commandId) && _submittedOutputCommandIds.has(commandId)) {
+      console.log("[EmbeddedTerminal] CommandId already fully executed, skipping init:", commandId);
+      setStatus("completed");
+      commandExecutedRef.current = true;
+      outputSubmittedRef.current = true;
+      return;
+    }
+    
     initializedRef.current = true;
 
     const initTerminal = async (attempt: number = 0): Promise<void> => {
@@ -287,8 +316,12 @@ export function EmbeddedTerminal({
           });
 
           if (!commandExecutedRef.current) {
-            commandExecutedRef.current = true;
-            await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
+            const sent = await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
+            if (sent) {
+              commandExecutedRef.current = true;
+            } else {
+              console.warn("[EmbeddedTerminal] Command already executed (dedup), skipping:", commandId);
+            }
           }
 
           return;
@@ -321,8 +354,12 @@ export function EmbeddedTerminal({
 
         setTimeout(async () => {
           if (!commandExecutedRef.current) {
-            commandExecutedRef.current = true;
-            await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
+            const sent = await terminalSessionManager.executeCommand(sessionName, command, commandId || "");
+            if (sent) {
+              commandExecutedRef.current = true;
+            } else {
+              console.warn("[EmbeddedTerminal] Command already executed (dedup), skipping:", commandId);
+            }
           }
         }, 300);
       } catch (error) {

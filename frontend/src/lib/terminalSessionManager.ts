@@ -20,23 +20,14 @@ export interface TerminalSession {
   listeners: Map<string, (data: string) => void>;
 }
 
-const getApiBase = () => {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace(/\d+-/, "8000-");
-    }
-  }
-  return "http://localhost:8000";
-};
 
-const API_BASE = getApiBase();
 
 class TerminalSessionManager {
   private sessions: Map<string, TerminalSession> = new Map();
   private sandboxRef: Sandbox | null = null;
   private sandboxConnecting: Promise<Sandbox | null> | null = null;
   private initializingSession: Map<string, Promise<TerminalSession | null>> = new Map();
+  private executedCommandIds: Set<string> = new Set();
 
   async connectSandbox(sandboxId: string, apiKey: string): Promise<Sandbox | null> {
     if (this.sandboxRef) {
@@ -198,11 +189,20 @@ class TerminalSessionManager {
     sessionName: string,
     command: string,
     commandId: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (commandId && this.executedCommandIds.has(commandId)) {
+      console.warn("[SessionManager] Duplicate commandId blocked:", commandId, "command:", command);
+      return false;
+    }
+
     const session = this.sessions.get(sessionName);
     if (!session) {
       console.error("[SessionManager] No session found for command execution:", sessionName);
-      return;
+      return false;
+    }
+
+    if (commandId) {
+      this.executedCommandIds.add(commandId);
     }
 
     session.isCommandRunning = true;
@@ -214,12 +214,18 @@ class TerminalSessionManager {
         session.pid,
         new TextEncoder().encode(command + "\n")
       );
-      console.log("[SessionManager] Command sent:", command, "in session:", sessionName);
+      console.log("[SessionManager] Command sent:", command, "in session:", sessionName, "commandId:", commandId);
+      return true;
     } catch (error) {
       console.error("[SessionManager] Failed to send command:", error);
       session.isCommandRunning = false;
       session.currentCommandId = null;
+      return false;
     }
+  }
+
+  hasExecutedCommand(commandId: string): boolean {
+    return this.executedCommandIds.has(commandId);
   }
 
   markCommandCompleted(sessionName: string): void {
@@ -288,6 +294,7 @@ class TerminalSessionManager {
     });
     this.sessions.clear();
     this.sandboxRef = null;
+    this.executedCommandIds.clear();
   }
 }
 

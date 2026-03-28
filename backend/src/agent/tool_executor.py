@@ -21,9 +21,20 @@ from ..services.e2b_sandbox import sandbox_manager
 
 _pending_shell_outputs: Dict[str, Dict[str, Any]] = {}
 _shell_output_events: Dict[str, asyncio.Event] = {}
+# Track command_ids that have already been registered to prevent duplicate execution
+_registered_command_ids: set = set()
 
 
-def register_shell_command(command_id: str) -> asyncio.Event:
+def register_shell_command(command_id: str) -> Optional[asyncio.Event]:
+    """Register a shell command for output coordination.
+    
+    Returns the asyncio.Event to wait on, or None if this command_id
+    was already registered (duplicate call).
+    """
+    if command_id in _registered_command_ids:
+        return None
+    
+    _registered_command_ids.add(command_id)
     _pending_shell_outputs[command_id] = {
         "output": "",
         "completed": False,
@@ -40,15 +51,21 @@ def submit_shell_output(
     success: bool = True,
     error: Optional[str] = None,
 ):
-    if command_id in _pending_shell_outputs:
-        _pending_shell_outputs[command_id] = {
-            "output": output,
-            "completed": True,
-            "success": success,
-            "error": error,
-        }
-        if command_id in _shell_output_events:
-            _shell_output_events[command_id].set()
+    if command_id not in _pending_shell_outputs:
+        return
+    
+    # Only accept the first submission for a given command_id
+    if _pending_shell_outputs[command_id].get("completed"):
+        return
+    
+    _pending_shell_outputs[command_id] = {
+        "output": output,
+        "completed": True,
+        "success": success,
+        "error": error,
+    }
+    if command_id in _shell_output_events:
+        _shell_output_events[command_id].set()
 
 
 def get_shell_output(command_id: str) -> Dict[str, Any]:
@@ -60,6 +77,7 @@ def get_shell_output(command_id: str) -> Dict[str, Any]:
 def cleanup_shell_command(command_id: str):
     _pending_shell_outputs.pop(command_id, None)
     _shell_output_events.pop(command_id, None)
+    _registered_command_ids.discard(command_id)
 
 
 # ---------------------------------------------------------------------------
@@ -98,11 +116,23 @@ async def execute_shell(
     if not command:
         return {"success": False, "error": "No command provided", "session_name": session_name}
 
+    if not command_id:
+        return {"success": False, "error": "No command_id provided", "session_name": session_name}
+
     sandbox = await sandbox_manager.get_sandbox(session_id)
     if not sandbox:
         return {"success": False, "error": "No sandbox found.", "session_name": session_name}
 
     completion_event = register_shell_command(command_id)
+    
+    # Duplicate command_id — this command was already dispatched
+    if completion_event is None:
+        return {
+            "success": False,
+            "error": f"Duplicate command_id '{command_id}' — command already dispatched",
+            "session_name": session_name,
+            "command": command,
+        }
 
     try:
         await asyncio.wait_for(completion_event.wait(), timeout=300)
