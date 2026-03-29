@@ -57,16 +57,6 @@ export interface ReadFileResult {
   error?: string;
 }
 
-export interface ShellResult {
-  success: boolean;
-  output?: string;
-  exit_code?: number;
-  session_name?: string;
-  command?: string;
-  error?: string;
-  
-}
-
 export interface ReplaceInFileResult {
   success: boolean;
   message?: string;
@@ -129,8 +119,6 @@ export interface AgentEvent {
     | "sandbox_creating"
     | "sandbox_ready"
     | "sandbox_error"
-    | "shell_exec_start"
-    | "shell_exec_end"
     | "replace_in_file_start"
     | "replace_in_file_end"
     | "insert_line_start"
@@ -146,14 +134,11 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ShellResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult;
+  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
   file_path?: string;
-  session_name?: string;
-  command?: string;
-  command_id?: string;  // Used to coordinate shell output between frontend and backend
   old_string?: string;  // For replace_in_file tool
   new_string?: string;  // For replace_in_file tool
   insert_line?: number;  // For insert_line tool
@@ -195,7 +180,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "shell_card" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
@@ -204,15 +189,10 @@ export interface ChatEntry {
   arguments?: Record<string, unknown>;
   result?: ToolResult;
   readResult?: ReadFileResult;
-  shellResult?: ShellResult;
   replaceResult?: ReplaceInFileResult;
   insertResult?: InsertLineResult;
   deleteResult?: DeleteLinesResult;
   deleteStrResult?: DeleteStrFromFileResult;
-  shellCommand?: string;
-  shellSessionName?: string;
-  shellStatus?: "running" | "completed" | "error";
-  shellCommandId?: string;  // Used to POST output back to backend
   timestamp: Date;
   isStreaming?: boolean;
   sandboxStatus?: "creating" | "ready" | "error";

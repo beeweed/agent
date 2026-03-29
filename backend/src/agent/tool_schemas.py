@@ -50,27 +50,6 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "shell",
-            "description": "Execute a shell command in a persistent named terminal session inside the sandbox. Sessions maintain state (cwd, env vars). Use for running builds, installs, tests, servers, etc.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "session_name": {
-                        "type": "string",
-                        "description": "Named session identifier. Reuse names like 'main', 'build', 'server' to maintain context."
-                    },
-                    "command": {
-                        "type": "string",
-                        "description": "Shell command to execute in bash."
-                    }
-                },
-                "required": ["session_name", "command"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "replace_in_file",
             "description": "Replace an exact string occurrence in an existing file. Use for targeted edits: fixing bugs, renaming, updating imports. The old_string must match exactly (whitespace-sensitive).",
             "parameters": {

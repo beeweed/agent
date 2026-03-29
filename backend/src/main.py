@@ -1,18 +1,14 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional
 import json
 import asyncio
 
 from .agent.react_agent import ReActAgent
-from .agent.tool_executor import submit_shell_output
 from .services.openrouter import fetch_models
 from .services.e2b_sandbox import sandbox_manager
-
-# Store active WebSocket connections for terminals
-terminal_connections: Dict[str, Dict[str, WebSocket]] = {}  # session_id -> {terminal_id -> websocket}
 
 app = FastAPI(title="Vibe Coder API", version="1.0.0")
 
@@ -47,66 +43,6 @@ class FileReadRequest(BaseModel):
 class SandboxRequest(BaseModel):
     e2b_api_key: str
     session_id: Optional[str] = "default"
-
-
-class TerminalCreateRequest(BaseModel):
-    terminal_id: str
-    cols: int = 80
-    rows: int = 24
-    e2b_api_key: str
-    session_id: Optional[str] = "default"
-
-
-class TerminalInputRequest(BaseModel):
-    terminal_id: str
-    data: str
-    session_id: Optional[str] = "default"
-
-
-class TerminalResizeRequest(BaseModel):
-    terminal_id: str
-    cols: int
-    rows: int
-    session_id: Optional[str] = "default"
-
-
-class TerminalCloseRequest(BaseModel):
-    terminal_id: str
-    session_id: Optional[str] = "default"
-
-
-class ShellOutputRequest(BaseModel):
-    """Request model for submitting shell command output from frontend terminal."""
-    command_id: str
-    output: str
-    success: bool = True
-    error: Optional[str] = None
-
-
-@app.post("/api/shell/output")
-async def submit_shell_command_output(request: ShellOutputRequest):
-    """
-    Receive shell command output from frontend EmbeddedTerminal.
-    
-    This endpoint is called by the frontend after a command completes
-    in the XTerm terminal. The output is then returned to the LLM.
-    
-    This is the key mechanism for ensuring single execution:
-    - Backend emits shell_exec_start with command_id
-    - Frontend executes command in XTerm
-    - Frontend POSTs output here
-    - Backend receives output and returns to LLM
-    """
-    try:
-        submit_shell_output(
-            command_id=request.command_id,
-            output=request.output,
-            success=request.success,
-            error=request.error
-        )
-        return {"success": True, "message": "Shell output received"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")
@@ -266,9 +202,6 @@ async def create_sandbox(request: SandboxRequest):
 async def sandbox_status(session_id: str = "default"):
     """Get E2B sandbox status for a session."""
     status = await sandbox_manager.get_sandbox_status(session_id)
-    # Include sandbox_id for frontend terminal connection
-    sandbox_info = sandbox_manager.sandbox_info.get(session_id, {})
-    status["sandbox_id"] = sandbox_info.get("sandbox_id")
     return status
 
 
@@ -315,184 +248,4 @@ async def get_status(session_id: str = "default"):
         "max_iterations": agent.max_iterations,
         "status": "running" if agent.is_running else "idle",
         "sandbox": sandbox_status
-    }
-
-
-# ============================================================================
-# TERMINAL ENDPOINTS
-# ============================================================================
-
-@app.post("/api/terminal/create")
-async def create_terminal(request: TerminalCreateRequest):
-    """Create a new PTY terminal in the E2B sandbox."""
-    session_id = request.session_id or "default"
-    
-    # Ensure sandbox exists (create if needed using the provided API key)
-    sandbox_status = await sandbox_manager.get_sandbox_status(session_id)
-    if not sandbox_status.get("is_running"):
-        # Create sandbox first
-        result = await sandbox_manager.create_sandbox(session_id, request.e2b_api_key)
-        if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("error", "Failed to create sandbox"))
-    
-    # Create terminal
-    result = await sandbox_manager.create_terminal(
-        session_id,
-        request.terminal_id,
-        request.cols,
-        request.rows
-    )
-    
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    
-    return result
-
-
-@app.post("/api/terminal/input")
-async def send_terminal_input(request: TerminalInputRequest):
-    """Send input to a terminal."""
-    session_id = request.session_id or "default"
-    
-    result = await sandbox_manager.send_terminal_input(
-        session_id,
-        request.terminal_id,
-        request.data
-    )
-    
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    
-    return result
-
-
-@app.post("/api/terminal/resize")
-async def resize_terminal(request: TerminalResizeRequest):
-    """Resize a terminal."""
-    session_id = request.session_id or "default"
-    
-    result = await sandbox_manager.resize_terminal(
-        session_id,
-        request.terminal_id,
-        request.cols,
-        request.rows
-    )
-    
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    
-    return result
-
-
-@app.post("/api/terminal/close")
-async def close_terminal(request: TerminalCloseRequest):
-    """Close a terminal."""
-    session_id = request.session_id or "default"
-    
-    result = await sandbox_manager.close_terminal(
-        session_id,
-        request.terminal_id
-    )
-    
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    
-    return result
-
-
-@app.websocket("/ws/terminal/{session_id}/{terminal_id}")
-async def terminal_websocket(websocket: WebSocket, session_id: str, terminal_id: str):
-    """
-    WebSocket endpoint for real-time terminal communication.
-    
-    Messages from client:
-    - {"type": "input", "data": "..."} - Send input to terminal
-    - {"type": "resize", "cols": N, "rows": N} - Resize terminal
-    
-    Messages to client:
-    - {"type": "output", "data": "..."} - Terminal output
-    - {"type": "error", "error": "..."} - Error message
-    """
-    await websocket.accept()
-    
-    # Store connection
-    if session_id not in terminal_connections:
-        terminal_connections[session_id] = {}
-    terminal_connections[session_id][terminal_id] = websocket
-    
-    try:
-        # Get terminal info
-        terminal_info = sandbox_manager.get_terminal_info(session_id, terminal_id)
-        if not terminal_info:
-            await websocket.send_json({"type": "error", "error": "Terminal not found"})
-            await websocket.close()
-            return
-        
-        # Get sandbox
-        sandbox = await sandbox_manager.get_sandbox(session_id)
-        if not sandbox:
-            await websocket.send_json({"type": "error", "error": "Sandbox not found"})
-            await websocket.close()
-            return
-        
-        # Set up output handler
-        async def send_output(data: bytes):
-            try:
-                # Send as base64-encoded string for binary safety
-                import base64
-                await websocket.send_json({
-                    "type": "output",
-                    "data": base64.b64encode(data).decode('utf-8')
-                })
-            except Exception:
-                pass
-        
-        # Subscribe to terminal output
-        pty = terminal_info.get("pty")
-        if pty:
-            pty.on_data = send_output
-        
-        # Handle incoming messages
-        while True:
-            try:
-                message = await websocket.receive_json()
-                msg_type = message.get("type")
-                
-                if msg_type == "input":
-                    data = message.get("data", "")
-                    await sandbox_manager.send_terminal_input(session_id, terminal_id, data)
-                
-                elif msg_type == "resize":
-                    cols = message.get("cols", 80)
-                    rows = message.get("rows", 24)
-                    await sandbox_manager.resize_terminal(session_id, terminal_id, cols, rows)
-                
-            except WebSocketDisconnect:
-                break
-            except Exception as e:
-                await websocket.send_json({"type": "error", "error": str(e)})
-    
-    finally:
-        # Cleanup connection
-        if session_id in terminal_connections:
-            terminal_connections[session_id].pop(terminal_id, None)
-            if not terminal_connections[session_id]:
-                del terminal_connections[session_id]
-
-
-@app.get("/api/terminal/list")
-async def list_terminals(session_id: str = "default"):
-    """List all terminals for a session."""
-    terminals = sandbox_manager.get_all_terminals(session_id)
-    return {
-        "success": True,
-        "terminals": [
-            {
-                "terminal_id": tid,
-                "pid": info.get("pid"),
-                "cols": info.get("cols"),
-                "rows": info.get("rows")
-            }
-            for tid, info in terminals.items()
-        ]
     }

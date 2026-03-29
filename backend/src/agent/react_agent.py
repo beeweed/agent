@@ -17,16 +17,12 @@ The LLM decides tool usage via API protocol, not prompt tricks.
 import json
 import re
 import asyncio
-import uuid
 from typing import AsyncGenerator, Optional, Callable
 
 from .models import ContextWindow
 from .system_prompt import get_system_prompt
 from .tool_schemas import TOOL_SCHEMAS
-from .tool_executor import (
-    TOOL_EXECUTORS,
-    submit_shell_output,
-)
+from .tool_executor import TOOL_EXECUTORS
 from ..services.openrouter import chat_completion
 from ..services.e2b_sandbox import sandbox_manager
 
@@ -347,27 +343,12 @@ class ReActAgent:
                         }
 
                         # --- Emit tool-specific start events for frontend ---
-                        shell_command_id = None
                         for evt in self._emit_tool_start_events(tool_name, tool_id, arguments):
                             yield evt
 
                         # --- Execute tool ---
                         if tool_name in TOOL_EXECUTORS:
-                            if tool_name == "shell":
-                                shell_command_id = str(uuid.uuid4())
-                                # Emit shell_exec_start with command_id for frontend coordination
-                                yield {
-                                    "type": "shell_exec_start",
-                                    "tool_id": tool_id,
-                                    "tool_name": "shell",
-                                    "session_name": arguments.get("session_name", "main"),
-                                    "command": arguments.get("command", ""),
-                                    "command_id": shell_command_id,
-                                    "iteration": self.current_iteration,
-                                }
-                                result = await TOOL_EXECUTORS["shell"](self.session_id, arguments, shell_command_id)
-                            else:
-                                result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
+                            result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                         else:
                             result = {"success": False, "error": f"Unknown tool: {tool_name}"}
 
@@ -489,16 +470,6 @@ class ReActAgent:
                 "tool_id": tool_id,
                 "tool_name": tool_name,
                 "file_path": arguments.get("file_path", ""),
-                "result": result,
-                "iteration": it,
-            }
-        elif tool_name == "shell":
-            yield {
-                "type": "shell_exec_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "session_name": arguments.get("session_name", "main"),
-                "command": arguments.get("command", ""),
                 "result": result,
                 "iteration": it,
             }
