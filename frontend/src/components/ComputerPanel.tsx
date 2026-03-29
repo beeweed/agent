@@ -1,6 +1,6 @@
-import { useEffect, useRef, useMemo, useCallback, useState } from "react";
+import { useEffect, useRef, useMemo, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser, GripHorizontal } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
 import { TerminalPanel } from "@/components/Terminal";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
@@ -182,17 +182,40 @@ export function ComputerPanel() {
 
   const showTerminal = sandboxStatus === "ready" || sandboxStatus === "creating";
 
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
+  const prevHeightRef = useRef(terminalHeight);
+  const lastClickRef = useRef(0);
+
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
+
+    // Double-click detection → toggle between min and expanded
+    const now = Date.now();
+    if (now - lastClickRef.current < 300) {
+      const containerH = containerRef.current?.clientHeight || 600;
+      if (terminalHeight < 200) {
+        setTerminalHeight(Math.min(prevHeightRef.current || 300, containerH - 120));
+      } else {
+        prevHeightRef.current = terminalHeight;
+        setTerminalHeight(80);
+      }
+      lastClickRef.current = 0;
+      return;
+    }
+    lastClickRef.current = now;
+
     isDragging.current = true;
-    startY.current = e.clientY;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    startY.current = clientY;
     startHeight.current = terminalHeight;
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: MouseEvent | TouchEvent) => {
       if (!isDragging.current) return;
-      const delta = startY.current - ev.clientY;
+      const currentY = "touches" in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY;
+      const delta = startY.current - currentY;
       const containerH = containerRef.current?.clientHeight || 600;
-      const newH = Math.max(100, Math.min(containerH - 120, startHeight.current + delta));
+      const minH = 80;
+      const maxH = containerH - 120;
+      const newH = Math.max(minH, Math.min(maxH, startHeight.current + delta));
       setTerminalHeight(newH);
     };
 
@@ -200,6 +223,8 @@ export function ComputerPanel() {
       isDragging.current = false;
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
@@ -208,6 +233,8 @@ export function ComputerPanel() {
     document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onUp);
   }, [terminalHeight, setTerminalHeight]);
 
   useEffect(() => {
@@ -490,15 +517,27 @@ export function ComputerPanel() {
         {/* Resizable Terminal Panel */}
         {showTerminal && (
           <>
-            {/* Drag handle */}
+            {/* Drag handle — supports mouse & touch, double-click to toggle */}
             <div
               data-design-id="terminal-resize-handle"
               onMouseDown={handleDragStart}
-              className="flex-shrink-0 flex items-center justify-center h-2 cursor-row-resize group mt-1"
+              onTouchStart={handleDragStart}
+              className="flex-shrink-0 flex items-center justify-center h-3 cursor-row-resize group mt-0.5 touch-none"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize terminal"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setTerminalHeight(Math.min((containerRef.current?.clientHeight || 600) - 120, terminalHeight + 20));
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setTerminalHeight(Math.max(80, terminalHeight - 20));
+                }
+              }}
             >
-              <div className="w-10 h-1 rounded-full bg-border group-hover:bg-[#7aa2f7]/50 transition-colors">
-                <GripHorizontal className="w-full h-full text-transparent group-hover:text-[#7aa2f7]/60" />
-              </div>
+              <div className="w-12 h-1 rounded-full bg-[#292e42] group-hover:bg-[#7aa2f7]/60 group-active:bg-[#7aa2f7] transition-colors" />
             </div>
 
             {/* Terminal */}

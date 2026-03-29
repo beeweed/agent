@@ -2,8 +2,9 @@
 Terminal Manager Service
 
 Manages PTY terminal sessions over WebSocket using E2B sandbox PTY API.
-Provides a real interactive shell experience - full bash with job control,
-signal handling, colors, cursor movement, and all PTY features.
+Provides a real interactive shell experience — full bash with job control,
+signal handling, colors, cursor movement, TUI apps (vim, htop, nano),
+and all PTY features a real VS Code terminal would support.
 """
 
 import asyncio
@@ -18,6 +19,9 @@ from e2b.sandbox.commands.command_handle import PtySize
 
 logger = logging.getLogger(__name__)
 
+PING_INTERVAL_SEC = 15
+COMMAND_TIMEOUT_SEC = 180  # 3 minutes
+
 
 class TerminalSession:
     """Represents a single PTY terminal session tied to an E2B sandbox."""
@@ -28,19 +32,37 @@ class TerminalSession:
         self.handle = None
         self.websocket: Optional[WebSocket] = None
         self._active = False
+        self._send_lock = asyncio.Lock()
+        self._last_activity = asyncio.get_event_loop().time()
 
     @property
     def is_active(self) -> bool:
         return self._active and self.pid is not None
 
+    def touch(self):
+        try:
+            self._last_activity = asyncio.get_event_loop().time()
+        except RuntimeError:
+            pass
+
+    async def safe_send(self, data: dict) -> bool:
+        if not self.websocket or not self._active:
+            return False
+        try:
+            async with self._send_lock:
+                await self.websocket.send_json(data)
+            return True
+        except Exception:
+            return False
+
 
 class TerminalManager:
     """
     Manages multiple PTY terminal sessions.
-    
+
     Each sandbox session can have one active PTY terminal.
     The terminal is a real bash shell running inside the E2B sandbox,
-    with full PTY support (colors, cursor, signals, job control).
+    with full PTY support (colors, cursor, signals, job control, TUI apps).
     """
 
     def __init__(self):
@@ -54,7 +76,7 @@ class TerminalManager:
     ):
         """
         Main WebSocket handler for terminal connections.
-        
+
         Creates a PTY in the E2B sandbox and bridges I/O between
         the WebSocket client and the sandbox PTY.
         """
@@ -67,26 +89,26 @@ class TerminalManager:
             await websocket.close()
             return
 
+        # Clean up any previous session for this ID
+        await self.cleanup_session(session_id)
+
         session = TerminalSession(session_id)
         session.websocket = websocket
         self.sessions[session_id] = session
 
-        send_lock = asyncio.Lock()
-
         async def on_pty_data(data: bytes):
-            """Callback when PTY produces output - forward to WebSocket."""
-            if session.websocket and session._active:
-                try:
-                    encoded = base64.b64encode(data).decode("ascii")
-                    async with send_lock:
-                        await session.websocket.send_json({
-                            "type": "output",
-                            "data": encoded,
-                        })
-                except Exception as e:
-                    logger.debug(f"Failed to send PTY output: {e}")
+            """Callback when PTY produces output — forward to WebSocket."""
+            if not session._active:
+                return
+            session.touch()
+            try:
+                encoded = base64.b64encode(data).decode("ascii")
+                await session.safe_send({"type": "output", "data": encoded})
+            except Exception as e:
+                logger.debug(f"Failed to send PTY output: {e}")
 
         try:
+            # Create the PTY with env vars that enable full TUI/color support
             pty_handle = await sandbox.pty.create(
                 size=PtySize(rows=24, cols=80),
                 on_data=on_pty_data,
@@ -96,64 +118,115 @@ class TerminalManager:
                     "COLORTERM": "truecolor",
                     "LANG": "en_US.UTF-8",
                     "LC_ALL": "en_US.UTF-8",
+                    "EDITOR": "vim",
+                    "VISUAL": "vim",
                 },
-                timeout=0,
+                timeout=0,  # unlimited — we manage lifecycle ourselves
             )
 
             session.handle = pty_handle
             session.pid = pty_handle.pid
             session._active = True
+            session.touch()
 
-            await websocket.send_json({
+            await session.safe_send({
                 "type": "connected",
                 "pid": pty_handle.pid,
             })
 
-            while True:
-                raw = await websocket.receive_text()
-                try:
-                    msg = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
+            # Start the ping/keepalive task
+            ping_task = asyncio.create_task(
+                self._ping_loop(session)
+            )
 
-                msg_type = msg.get("type")
-
-                if msg_type == "input":
-                    data_b64 = msg.get("data", "")
+            try:
+                while session._active:
                     try:
-                        raw_bytes = base64.b64decode(data_b64)
-                        await sandbox.pty.send_stdin(session.pid, raw_bytes)
-                    except Exception as e:
-                        logger.debug(f"Failed to send stdin: {e}")
-
-                elif msg_type == "resize":
-                    cols = msg.get("cols", 80)
-                    rows = msg.get("rows", 24)
-                    try:
-                        await sandbox.pty.resize(
-                            session.pid,
-                            PtySize(rows=rows, cols=cols),
+                        raw = await asyncio.wait_for(
+                            websocket.receive_text(),
+                            timeout=COMMAND_TIMEOUT_SEC,
                         )
-                    except Exception as e:
-                        logger.debug(f"Failed to resize PTY: {e}")
+                    except asyncio.TimeoutError:
+                        # 3 minute idle timeout — send a notice but keep alive
+                        await session.safe_send({
+                            "type": "output",
+                            "data": base64.b64encode(
+                                b"\r\n\x1b[33m[Terminal idle for 3 minutes]\x1b[0m\r\n"
+                            ).decode("ascii"),
+                        })
+                        session.touch()
+                        continue
 
-                elif msg_type == "ping":
-                    async with send_lock:
-                        await websocket.send_json({"type": "pong"})
+                    session.touch()
+
+                    try:
+                        msg = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+
+                    msg_type = msg.get("type")
+
+                    if msg_type == "input":
+                        data_b64 = msg.get("data", "")
+                        try:
+                            raw_bytes = base64.b64decode(data_b64)
+                            await sandbox.pty.send_stdin(session.pid, raw_bytes)
+                        except Exception as e:
+                            logger.debug(f"Failed to send stdin: {e}")
+                            # If stdin fails, the PTY may have died — try to notify
+                            await session.safe_send({
+                                "type": "error",
+                                "message": f"PTY stdin error: {e}",
+                            })
+
+                    elif msg_type == "resize":
+                        cols = msg.get("cols", 80)
+                        rows = msg.get("rows", 24)
+                        try:
+                            await sandbox.pty.resize(
+                                session.pid,
+                                PtySize(rows=rows, cols=cols),
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to resize PTY: {e}")
+
+                    elif msg_type == "ping":
+                        await session.safe_send({"type": "pong"})
+
+            finally:
+                ping_task.cancel()
+                try:
+                    await ping_task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
         except Exception as e:
-            if "disconnect" not in str(e).lower() and "1000" not in str(e):
+            err_str = str(e).lower()
+            if "disconnect" not in err_str and "1000" not in err_str and "1001" not in err_str:
                 logger.error(f"Terminal session error: {e}")
-                try:
-                    async with send_lock:
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": str(e),
-                        })
-                except Exception:
-                    pass
+                await session.safe_send({
+                    "type": "error",
+                    "message": str(e),
+                })
         finally:
             session._active = False
+
+    async def _ping_loop(self, session: TerminalSession):
+        """Send periodic pings to keep the WebSocket alive."""
+        try:
+            while session._active:
+                await asyncio.sleep(PING_INTERVAL_SEC)
+                if not session._active:
+                    break
+                ok = await session.safe_send({"type": "ping"})
+                if not ok:
+                    logger.debug(f"Ping failed for session {session.session_id}, marking inactive")
+                    session._active = False
+                    break
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
 
     async def cleanup_session(self, session_id: str):
         """Clean up terminal session resources."""
@@ -165,6 +238,8 @@ class TerminalManager:
                     await session.handle.kill()
                 except Exception:
                     pass
+            session.websocket = None
+            session.handle = None
 
 
 terminal_manager = TerminalManager()
