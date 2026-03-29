@@ -1,6 +1,7 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useStore } from "@/store/useStore";
-import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
+import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser, GripHorizontal } from "lucide-react";
+import { TerminalPanel } from "@/components/Terminal";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -172,8 +173,42 @@ function DeleteStrView({ filePath, targetStr }: { filePath: string; targetStr: s
 }
 
 export function ComputerPanel() {
-  const { codeStreaming, isAgentRunning } = useStore();
+  const { codeStreaming, isAgentRunning, sandboxStatus, terminalHeight, setTerminalHeight } = useStore();
   const codeContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
+
+  const showTerminal = sandboxStatus === "ready" || sandboxStatus === "creating";
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    startY.current = e.clientY;
+    startHeight.current = terminalHeight;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = startY.current - ev.clientY;
+      const containerH = containerRef.current?.clientHeight || 600;
+      const newH = Math.max(100, Math.min(containerH - 120, startHeight.current + delta));
+      setTerminalHeight(newH);
+    };
+
+    const onUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [terminalHeight, setTerminalHeight]);
 
   useEffect(() => {
     if (codeContainerRef.current) {
@@ -253,8 +288,8 @@ export function ComputerPanel() {
   };
 
   return (
-    <div data-design-id="computer-panel" className="flex flex-col h-full overflow-hidden">
-      <div data-design-id="computer-header" className="p-2 xs:p-3 sm:p-4 border-b border-border">
+    <div ref={containerRef} data-design-id="computer-panel" className="flex flex-col h-full overflow-hidden">
+      <div data-design-id="computer-header" className="p-2 xs:p-3 sm:p-4 border-b border-border flex-shrink-0">
         <div className="flex justify-between items-center mb-1.5 xs:mb-2 sm:mb-3">
           <h2 data-design-id="computer-title" className="font-medium text-foreground text-xs xs:text-sm sm:text-base">
             Anygent Computer
@@ -330,9 +365,12 @@ export function ComputerPanel() {
         </div>
       </div>
 
-      <div data-design-id="computer-content" className="flex-1 p-1.5 xs:p-2 sm:p-3.5 overflow-hidden flex flex-col">
-        <div className="flex-1 flex flex-col rounded-md xs:rounded-lg sm:rounded-xl bg-secondary border border-border shadow-sm overflow-hidden">
-          <div data-design-id="computer-file-header" className="flex justify-center items-center min-h-7 xs:min-h-8 sm:min-h-9 border-b border-border bg-card/50">
+      <div data-design-id="computer-content" className="flex-1 p-1.5 xs:p-2 sm:p-3.5 overflow-hidden flex flex-col min-h-0">
+        {/* Code editor area */}
+        <div className={`flex flex-col rounded-md xs:rounded-lg sm:rounded-xl bg-secondary border border-border shadow-sm overflow-hidden ${showTerminal ? '' : 'flex-1'}`}
+          style={showTerminal ? { flex: '1 1 0', minHeight: '120px' } : undefined}
+        >
+          <div data-design-id="computer-file-header" className="flex justify-center items-center min-h-7 xs:min-h-8 sm:min-h-9 border-b border-border bg-card/50 flex-shrink-0">
             <span className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground truncate px-2">
               {codeStreaming.filePath ? getFileName(codeStreaming.filePath) : "No file selected"}
             </span>
@@ -343,7 +381,6 @@ export function ComputerPanel() {
             ref={codeContainerRef}
             className="flex-1 overflow-auto bg-[#f5f5f5] p-1.5 xs:p-2 sm:p-3"
           >
-            {/* Diff view for replace_in_file tool */}
             {codeStreaming.isDeleteStrView && codeStreaming.targetStr ? (
               <DeleteStrView 
                 filePath={codeStreaming.filePath}
@@ -408,7 +445,7 @@ export function ComputerPanel() {
             )}
           </div>
 
-          <div data-design-id="computer-controls" className="flex items-center px-1.5 xs:px-2 sm:px-4 py-1 xs:py-1.5 sm:py-2 border-t border-border bg-card">
+          <div data-design-id="computer-controls" className="flex items-center px-1.5 xs:px-2 sm:px-4 py-1 xs:py-1.5 sm:py-2 border-t border-border bg-card flex-shrink-0">
             <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 flex-shrink-0">
               <button 
                 className="w-6 h-6 xs:w-7 xs:h-7 sm:w-6 sm:h-6 flex items-center justify-center text-muted-foreground hover:text-foreground active:bg-accent disabled:opacity-30 transition-colors rounded"
@@ -449,6 +486,31 @@ export function ComputerPanel() {
             </div>
           </div>
         </div>
+
+        {/* Resizable Terminal Panel */}
+        {showTerminal && (
+          <>
+            {/* Drag handle */}
+            <div
+              data-design-id="terminal-resize-handle"
+              onMouseDown={handleDragStart}
+              className="flex-shrink-0 flex items-center justify-center h-2 cursor-row-resize group mt-1"
+            >
+              <div className="w-10 h-1 rounded-full bg-border group-hover:bg-[#7aa2f7]/50 transition-colors">
+                <GripHorizontal className="w-full h-full text-transparent group-hover:text-[#7aa2f7]/60" />
+              </div>
+            </div>
+
+            {/* Terminal */}
+            <div
+              data-design-id="terminal-container"
+              className="flex-shrink-0 rounded-md xs:rounded-lg sm:rounded-xl overflow-hidden border border-[#292e42] mt-0.5"
+              style={{ height: `${terminalHeight}px` }}
+            >
+              <TerminalPanel className="h-full" />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

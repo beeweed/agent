@@ -1,14 +1,18 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 import json
 import asyncio
+import logging
 
 from .agent.react_agent import ReActAgent
 from .services.openrouter import fetch_models
 from .services.e2b_sandbox import sandbox_manager
+from .services.terminal_manager import terminal_manager
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Vibe Coder API", version="1.0.0")
 
@@ -224,6 +228,38 @@ async def sandbox_keepalive(request: SandboxRequest):
         request.e2b_api_key
     )
     return result
+
+
+@app.websocket("/ws/terminal/{session_id}")
+async def terminal_websocket(websocket: WebSocket, session_id: str = "default"):
+    """
+    WebSocket endpoint for interactive PTY terminal.
+    
+    Protocol:
+      Client -> Server (JSON):
+        { "type": "input", "data": "<base64-encoded-bytes>" }
+        { "type": "resize", "cols": 80, "rows": 24 }
+      
+      Server -> Client (JSON):
+        { "type": "output", "data": "<base64-encoded-bytes>" }
+        { "type": "error", "message": "..." }
+        { "type": "exit", "exit_code": 0 }
+        { "type": "connected", "pid": 123 }
+    """
+    await websocket.accept()
+    
+    try:
+        await terminal_manager.handle_websocket(websocket, session_id, sandbox_manager)
+    except WebSocketDisconnect:
+        logger.info(f"Terminal WebSocket disconnected for session {session_id}")
+    except Exception as e:
+        logger.error(f"Terminal WebSocket error for session {session_id}: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        await terminal_manager.cleanup_session(session_id)
 
 
 @app.get("/api/status")

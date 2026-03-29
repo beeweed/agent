@@ -499,3 +499,39 @@
 [data-design-id="computer-code-area"] .hljs-selector-id { 
   color: #005cc5; 
 }
+
+/* XTerm Terminal Overrides */
+[data-design-id="terminal-body"] .xterm {
+  height: 100%;
+  padding: 2px 4px;
+}
+
+[data-design-id="terminal-body"] .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #292e42;
+  border-radius: 3px;
+}
+
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #3b4261;
+}
+
+[data-design-id="terminal-body"] .xterm-screen {
+  height: 100% !important;
+}
+
+/* Terminal selection */
+[data-design-id="terminal-body"] .xterm .xterm-selection div {
+  background-color: rgba(122, 162, 247, 0.3) !important;
+}
