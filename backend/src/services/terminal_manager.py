@@ -5,12 +5,16 @@ Manages PTY terminal sessions over WebSocket using E2B sandbox PTY API.
 Provides a real interactive shell experience — full bash with job control,
 signal handling, colors, cursor movement, TUI apps (vim, htop, nano),
 and all PTY features a real VS Code terminal would support.
+
+Shell tool commands are executed exclusively through the PTY terminal.
+Output is captured by monitoring PTY data until the shell prompt appears.
 """
 
 import asyncio
 import base64
 import json
 import logging
+import re
 from typing import Dict, Optional
 
 from fastapi import WebSocket
@@ -21,6 +25,13 @@ logger = logging.getLogger(__name__)
 
 PING_INTERVAL_SEC = 15
 COMMAND_TIMEOUT_SEC = 180  # 3 minutes
+SHELL_COMMAND_TIMEOUT_SEC = 120  # 2 minutes max for a single command
+
+ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[.*?[@-~]|\r')
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE_RE.sub('', text)
 
 
 class TerminalSession:
@@ -34,6 +45,9 @@ class TerminalSession:
         self._active = False
         self._send_lock = asyncio.Lock()
         self._last_activity = asyncio.get_event_loop().time()
+        self._capture_buffer: list[bytes] = []
+        self._capturing = False
+        self._capture_event: Optional[asyncio.Event] = None
 
     @property
     def is_active(self) -> bool:
@@ -44,6 +58,31 @@ class TerminalSession:
             self._last_activity = asyncio.get_event_loop().time()
         except RuntimeError:
             pass
+
+    def start_capture(self):
+        self._capture_buffer = []
+        self._capture_event = asyncio.Event()
+        self._capturing = True
+
+    def stop_capture(self) -> str:
+        self._capturing = False
+        raw = b"".join(self._capture_buffer)
+        self._capture_buffer = []
+        self._capture_event = None
+        return raw.decode("utf-8", errors="replace")
+
+    def append_capture(self, data: bytes):
+        if self._capturing:
+            self._capture_buffer.append(data)
+            raw_so_far = b"".join(self._capture_buffer).decode("utf-8", errors="replace")
+            cleaned = strip_ansi(raw_so_far)
+            lines = cleaned.split("\n")
+            for line in lines[-3:]:
+                stripped = line.strip()
+                if stripped.endswith("$") or stripped.endswith("$ ") or stripped.endswith("#") or stripped.endswith("# "):
+                    if self._capture_event:
+                        self._capture_event.set()
+                    return
 
     async def safe_send(self, data: dict) -> bool:
         if not self.websocket or not self._active:
@@ -97,10 +136,11 @@ class TerminalManager:
         self.sessions[session_id] = session
 
         async def on_pty_data(data: bytes):
-            """Callback when PTY produces output — forward to WebSocket."""
+            """Callback when PTY produces output — forward to WebSocket and capture buffer."""
             if not session._active:
                 return
             session.touch()
+            session.append_capture(data)
             try:
                 encoded = base64.b64encode(data).decode("ascii")
                 await session.safe_send({"type": "output", "data": encoded})
@@ -228,41 +268,114 @@ class TerminalManager:
         except Exception:
             pass
 
-    async def inject_command(self, session_id: str, command: str, sandbox_manager) -> bool:
+    async def execute_in_terminal(
+        self,
+        session_id: str,
+        command: str,
+        sandbox_manager,
+        timeout: int = SHELL_COMMAND_TIMEOUT_SEC,
+        wait_for_output: bool = True,
+    ) -> dict:
         """
-        Inject a command into an active PTY terminal session.
-        
-        This types the command into the terminal so the user sees it
-        as if a human typed it. The actual execution and output capture
-        is handled separately via sandbox.commands.run().
-        
+        Execute a command in the PTY terminal and capture its output.
+
+        The command is typed into the real terminal visible to the user.
+        Output is captured by buffering PTY data until the shell prompt
+        (ending with '$' or '#') re-appears, indicating the command finished.
+
         Args:
             session_id: Session identifier
-            command: The shell command to inject
+            command: The shell command to execute
             sandbox_manager: Reference to sandbox manager for PTY access
-            
+            timeout: Max seconds to wait for the command to finish
+            wait_for_output: If False, fire-and-forget (don't wait for prompt)
+
         Returns:
-            True if command was injected successfully
+            Dict with success, output, and optional exit_code
         """
         session = self.sessions.get(session_id)
         if not session or not session.is_active or not session.pid:
-            logger.warning(f"No active terminal session for {session_id}, cannot inject command")
-            return False
+            logger.warning(f"No active terminal session for {session_id}, cannot execute command")
+            return {
+                "success": False,
+                "output": "No active terminal session. Terminal may not be connected.",
+                "error": "No active terminal session",
+            }
 
         try:
             sandbox = await sandbox_manager.get_sandbox(session_id)
             if not sandbox:
                 logger.warning(f"No sandbox found for {session_id}")
-                return False
+                return {
+                    "success": False,
+                    "output": "No sandbox found for session.",
+                    "error": "No sandbox found",
+                }
 
-            # Send the command text + Enter to the PTY stdin
-            # This makes it appear in the terminal as if user typed it
+            if not wait_for_output:
+                command_bytes = (command + "\n").encode("utf-8")
+                await sandbox.pty.send_stdin(session.pid, command_bytes)
+                return {
+                    "success": True,
+                    "output": "Command started in background (no output captured).",
+                }
+
+            session.start_capture()
+
             command_bytes = (command + "\n").encode("utf-8")
             await sandbox.pty.send_stdin(session.pid, command_bytes)
-            return True
+
+            try:
+                await asyncio.wait_for(
+                    session._capture_event.wait(),
+                    timeout=timeout,
+                )
+            except asyncio.TimeoutError:
+                raw_output = session.stop_capture()
+                cleaned = strip_ansi(raw_output)
+                lines = cleaned.strip().split("\n")
+                if lines and lines[0].strip() == command.strip():
+                    lines = lines[1:]
+                output = "\n".join(lines).strip()
+                if not output:
+                    output = "(command timed out with no output)"
+                return {
+                    "success": True,
+                    "output": output,
+                    "timed_out": True,
+                }
+
+            await asyncio.sleep(0.1)
+
+            raw_output = session.stop_capture()
+            cleaned = strip_ansi(raw_output)
+
+            lines = cleaned.strip().split("\n")
+            if lines and lines[0].strip() == command.strip():
+                lines = lines[1:]
+            if lines:
+                last = lines[-1].strip()
+                if last.endswith("$") or last.endswith("#") or last.endswith("$ ") or last.endswith("# "):
+                    lines = lines[:-1]
+
+            output = "\n".join(lines).strip()
+            if not output:
+                output = "Command executed successfully (no output)."
+
+            return {
+                "success": True,
+                "output": output,
+            }
+
         except Exception as e:
-            logger.error(f"Failed to inject command into terminal: {e}")
-            return False
+            logger.error(f"Failed to execute command in terminal: {e}")
+            if session._capturing:
+                session.stop_capture()
+            return {
+                "success": False,
+                "output": str(e),
+                "error": str(e),
+            }
 
     async def cleanup_session(self, session_id: str):
         """Clean up terminal session resources."""

@@ -209,11 +209,11 @@ async def execute_delete_str(session_id: str, arguments: dict) -> dict:
 
 async def execute_shell(session_id: str, arguments: dict) -> dict:
     """
-    Execute a shell command in the sandbox.
-    
-    The command is injected into the existing terminal PTY so the user
-    can see it being typed and executed in real-time. The actual output
-    is captured via sandbox.commands.run() for return to the LLM.
+    Execute a shell command exclusively through the PTY terminal.
+
+    The command is typed into the real terminal (visible in the Computer Panel).
+    Output is captured by monitoring PTY data until the shell prompt ('$')
+    re-appears, meaning the command has finished. No separate process is spawned.
     """
     command = arguments.get("command", "")
     wait_for_output = arguments.get("wait_for_output", True)
@@ -221,13 +221,10 @@ async def execute_shell(session_id: str, arguments: dict) -> dict:
     if not command:
         return {"success": False, "output": "No command provided"}
 
-    # 1. Inject command into the visible terminal PTY
-    await terminal_manager.inject_command(session_id, command, sandbox_manager)
-
-    # 2. Execute via sandbox commands API to capture output
-    result = await sandbox_manager.execute_command(
+    result = await terminal_manager.execute_in_terminal(
         session_id,
         command,
+        sandbox_manager,
         wait_for_output=wait_for_output,
     )
 
