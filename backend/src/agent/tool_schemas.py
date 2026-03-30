@@ -139,4 +139,34 @@ TOOL_SCHEMAS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "shell",
+            "description": "Execute a shell command in a persistent named terminal session inside the sandbox. Commands run in the real terminal visible to the user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_name": {
+                        "type": "string",
+                        "description": "Unique session identifier for terminal instance."
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Shell command to execute."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "5-10 word explanation of command purpose."
+                    },
+                    "wait_for_output": {
+                        "type": "boolean",
+                        "description": "Wait for completion or run in background.",
+                        "default": True
+                    }
+                },
+                "required": ["session_name", "command", "description"]
+            }
+        }
+    },
 ]

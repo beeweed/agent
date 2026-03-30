@@ -506,6 +506,85 @@ class E2BSandboxManager:
             "is_running": False
         }
     
+    async def execute_command(
+        self,
+        session_id: str,
+        command: str,
+        wait_for_output: bool = True,
+        timeout: int = 120,
+    ) -> dict:
+        """
+        Execute a shell command in the sandbox using the E2B commands API.
+        This runs the command and captures stdout/stderr.
+        
+        For terminal visibility, the terminal_manager will inject the command
+        into the PTY separately.
+        
+        Args:
+            session_id: Session identifier
+            command: Shell command to execute
+            wait_for_output: Whether to wait for completion
+            timeout: Command timeout in seconds
+            
+        Returns:
+            Dictionary with command output
+        """
+        try:
+            sandbox = self.sandboxes.get(session_id)
+            if not sandbox:
+                return {
+                    "success": False,
+                    "error": "No sandbox found for session",
+                    "output": "",
+                }
+
+            if not wait_for_output:
+                # Run in background — don't wait
+                await sandbox.commands.run(
+                    f"nohup {command} > /dev/null 2>&1 &",
+                    timeout=10,
+                    cwd="/home/user",
+                )
+                return {
+                    "success": True,
+                    "output": "command runned but no output",
+                }
+
+            # Run command and capture output
+            result = await sandbox.commands.run(
+                command,
+                timeout=timeout,
+                cwd="/home/user",
+            )
+
+            stdout = result.stdout or ""
+            stderr = result.stderr or ""
+            
+            # Combine output
+            output = ""
+            if stdout:
+                output += stdout
+            if stderr:
+                if output:
+                    output += "\n"
+                output += stderr
+
+            if not output.strip():
+                output = "command runned but no output"
+
+            return {
+                "success": result.exit_code == 0,
+                "output": output,
+                "exit_code": result.exit_code,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "output": str(e),
+            }
+
     async def cleanup_all(self):
         """Cleanup all sandboxes."""
         for session_id in list(self.sandboxes.keys()):

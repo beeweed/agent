@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult, ShellResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -122,6 +122,7 @@ export function ChatPanel() {
     let currentInsertLineCardId: string | null = null;
     let currentDeleteLinesCardId: string | null = null;
     let currentDeleteStrCardId: string | null = null;
+    let currentShellCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -547,6 +548,46 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
+
+          case "shell_exec_start":
+            {
+              const command = event.command || "";
+              const sessionName = event.session_name || "default";
+              const description = event.description || "Running command";
+              console.log("[SHELL_EXEC_START]", command);
+
+              const shellEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "shell_card",
+                shellCommand: command,
+                shellSessionName: sessionName,
+                shellDescription: description,
+                shellStatus: "running",
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentShellCardId = shellEntry.id;
+              addChatEntry(shellEntry);
+            }
+            break;
+
+          case "shell_exec_end":
+            {
+              const result = event.result as ShellResult;
+              console.log("[SHELL_EXEC_END]", result?.success);
+
+              if (currentShellCardId) {
+                updateChatEntry(currentShellCardId, {
+                  shellStatus: result?.success ? "completed" : "error",
+                  shellResult: result,
+                });
+                currentShellCardId = null;
+              }
+
+              // Refresh file tree in case the command modified files
+              fetchFileTree();
+            }
+            break;
             
           case "tool_error":
             if (currentFileCardId) {
@@ -572,6 +613,10 @@ export function ChatPanel() {
             if (currentDeleteStrCardId) {
               updateChatEntry(currentDeleteStrCardId, { fileStatus: "error" });
               currentDeleteStrCardId = null;
+            }
+            if (currentShellCardId) {
+              updateChatEntry(currentShellCardId, { shellStatus: "error" });
+              currentShellCardId = null;
             }
             setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;

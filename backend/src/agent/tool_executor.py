@@ -11,6 +11,7 @@ after the API returns a structured tool_call object.
 from typing import Dict, Optional, Callable, Awaitable
 
 from ..services.e2b_sandbox import sandbox_manager
+from ..services.terminal_manager import terminal_manager
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +207,33 @@ async def execute_delete_str(session_id: str, arguments: dict) -> dict:
     }
 
 
+async def execute_shell(session_id: str, arguments: dict) -> dict:
+    """
+    Execute a shell command in the sandbox.
+    
+    The command is injected into the existing terminal PTY so the user
+    can see it being typed and executed in real-time. The actual output
+    is captured via sandbox.commands.run() for return to the LLM.
+    """
+    command = arguments.get("command", "")
+    wait_for_output = arguments.get("wait_for_output", True)
+
+    if not command:
+        return {"success": False, "output": "No command provided"}
+
+    # 1. Inject command into the visible terminal PTY
+    await terminal_manager.inject_command(session_id, command, sandbox_manager)
+
+    # 2. Execute via sandbox commands API to capture output
+    result = await sandbox_manager.execute_command(
+        session_id,
+        command,
+        wait_for_output=wait_for_output,
+    )
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Tool registry — maps tool name → executor function
 # ---------------------------------------------------------------------------
@@ -217,4 +245,5 @@ TOOL_EXECUTORS: Dict[str, Callable[..., Awaitable[dict]]] = {
     "insert_line": execute_insert_line,
     "delete_lines": execute_delete_lines,
     "delete_str": execute_delete_str,
+    "shell": execute_shell,
 }

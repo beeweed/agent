@@ -228,6 +228,42 @@ class TerminalManager:
         except Exception:
             pass
 
+    async def inject_command(self, session_id: str, command: str, sandbox_manager) -> bool:
+        """
+        Inject a command into an active PTY terminal session.
+        
+        This types the command into the terminal so the user sees it
+        as if a human typed it. The actual execution and output capture
+        is handled separately via sandbox.commands.run().
+        
+        Args:
+            session_id: Session identifier
+            command: The shell command to inject
+            sandbox_manager: Reference to sandbox manager for PTY access
+            
+        Returns:
+            True if command was injected successfully
+        """
+        session = self.sessions.get(session_id)
+        if not session or not session.is_active or not session.pid:
+            logger.warning(f"No active terminal session for {session_id}, cannot inject command")
+            return False
+
+        try:
+            sandbox = await sandbox_manager.get_sandbox(session_id)
+            if not sandbox:
+                logger.warning(f"No sandbox found for {session_id}")
+                return False
+
+            # Send the command text + Enter to the PTY stdin
+            # This makes it appear in the terminal as if user typed it
+            command_bytes = (command + "\n").encode("utf-8")
+            await sandbox.pty.send_stdin(session.pid, command_bytes)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to inject command into terminal: {e}")
+            return False
+
     async def cleanup_session(self, session_id: str):
         """Clean up terminal session resources."""
         session = self.sessions.pop(session_id, None)

@@ -413,7 +413,18 @@ class ReActAgent:
         """Yield start events so frontend can show appropriate UI cards."""
         it = self.current_iteration
 
-        if tool_name == "file_read":
+        if tool_name == "shell":
+            yield {
+                "type": "shell_exec_start",
+                "tool_id": tool_id,
+                "tool_name": tool_name,
+                "command": arguments.get("command", ""),
+                "session_name": arguments.get("session_name", "default"),
+                "description": arguments.get("description", ""),
+                "wait_for_output": arguments.get("wait_for_output", True),
+                "iteration": it,
+            }
+        elif tool_name == "file_read":
             yield {
                 "type": "read_file_start",
                 "tool_id": tool_id,
@@ -464,7 +475,18 @@ class ReActAgent:
         """Yield end events so frontend can update UI cards with results."""
         it = self.current_iteration
 
-        if tool_name == "file_read":
+        if tool_name == "shell":
+            yield {
+                "type": "shell_exec_end",
+                "tool_id": tool_id,
+                "tool_name": tool_name,
+                "command": arguments.get("command", ""),
+                "session_name": arguments.get("session_name", "default"),
+                "description": arguments.get("description", ""),
+                "result": result,
+                "iteration": it,
+            }
+        elif tool_name == "file_read":
             yield {
                 "type": "read_file_end",
                 "tool_id": tool_id,
