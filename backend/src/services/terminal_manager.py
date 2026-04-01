@@ -112,14 +112,24 @@ class TerminalManager:
         websocket: WebSocket,
         session_id: str,
         sandbox_manager,
+        sandbox_session_id: str = None,
     ):
         """
         Main WebSocket handler for terminal connections.
 
         Creates a PTY in the E2B sandbox and bridges I/O between
         the WebSocket client and the sandbox PTY.
+
+        Args:
+            websocket: The WebSocket connection
+            session_id: Unique key for this terminal session (may include terminal index)
+            sandbox_manager: Reference to the sandbox manager
+            sandbox_session_id: The sandbox session to look up (defaults to session_id
+                               for backward compatibility). For multi-terminal, this is
+                               the base session_id while session_id is the composite key.
         """
-        sandbox = await sandbox_manager.get_sandbox(session_id)
+        lookup_id = sandbox_session_id or session_id
+        sandbox = await sandbox_manager.get_sandbox(lookup_id)
         if not sandbox:
             await websocket.send_json({
                 "type": "error",

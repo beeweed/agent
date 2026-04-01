@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useCallback } from "react";
 import { useStore } from "@/store/useStore";
 import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
-import { TerminalPanel } from "@/components/Terminal";
+import { MultiTerminal } from "@/components/MultiTerminal";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -546,7 +546,7 @@ export function ComputerPanel() {
               className="flex-shrink-0 rounded-md xs:rounded-lg sm:rounded-xl overflow-hidden border border-[#292e42] mt-0.5"
               style={{ height: `${terminalHeight}px` }}
             >
-              <TerminalPanel className="h-full" />
+              <MultiTerminal className="h-full" />
             </div>
           </>
         )}

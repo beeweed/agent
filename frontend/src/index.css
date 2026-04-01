@@ -501,37 +501,45 @@
 }
 
 /* XTerm Terminal Overrides */
-[data-design-id="terminal-body"] .xterm {
+[data-design-id="terminal-body"] .xterm,
+.terminal-xterm-body .xterm {
   height: 100%;
   padding: 2px 4px;
 }
 
-[data-design-id="terminal-body"] .xterm-viewport {
+[data-design-id="terminal-body"] .xterm-viewport,
+.terminal-xterm-body .xterm-viewport {
   overflow-y: auto !important;
 }
 
-[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar {
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar,
+.terminal-xterm-body .xterm-viewport::-webkit-scrollbar {
   width: 6px;
 }
 
-[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-track {
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-track,
+.terminal-xterm-body .xterm-viewport::-webkit-scrollbar-track {
   background: transparent;
 }
 
-[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb {
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb,
+.terminal-xterm-body .xterm-viewport::-webkit-scrollbar-thumb {
   background: #292e42;
   border-radius: 3px;
 }
 
-[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb:hover {
+[data-design-id="terminal-body"] .xterm-viewport::-webkit-scrollbar-thumb:hover,
+.terminal-xterm-body .xterm-viewport::-webkit-scrollbar-thumb:hover {
   background: #3b4261;
 }
 
-[data-design-id="terminal-body"] .xterm-screen {
+[data-design-id="terminal-body"] .xterm-screen,
+.terminal-xterm-body .xterm-screen {
   height: 100% !important;
 }
 
 /* Terminal selection */
-[data-design-id="terminal-body"] .xterm .xterm-selection div {
+[data-design-id="terminal-body"] .xterm .xterm-selection div,
+.terminal-xterm-body .xterm .xterm-selection div {
   background-color: rgba(122, 162, 247, 0.3) !important;
 }

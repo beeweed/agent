@@ -233,7 +233,7 @@ async def sandbox_keepalive(request: SandboxRequest):
 @app.websocket("/ws/terminal/{session_id}")
 async def terminal_websocket(websocket: WebSocket, session_id: str = "default"):
     """
-    WebSocket endpoint for interactive PTY terminal.
+    WebSocket endpoint for interactive PTY terminal (legacy single-terminal).
     
     Protocol:
       Client -> Server (JSON):
@@ -260,6 +260,40 @@ async def terminal_websocket(websocket: WebSocket, session_id: str = "default"):
             pass
     finally:
         await terminal_manager.cleanup_session(session_id)
+
+
+@app.websocket("/ws/terminal/{session_id}/{terminal_id}")
+async def terminal_websocket_multi(websocket: WebSocket, session_id: str, terminal_id: str):
+    """
+    WebSocket endpoint for multi-terminal support.
+    
+    Each terminal tab connects with a unique terminal_id.
+    All terminals within the same session_id share the same E2B sandbox
+    but get independent PTY processes.
+    
+    The composite key `{session_id}__term__{terminal_id}` is used internally
+    to manage separate TerminalSession instances while the sandbox is looked up
+    by the original session_id.
+    """
+    await websocket.accept()
+    
+    terminal_session_key = f"{session_id}__term__{terminal_id}"
+    
+    try:
+        await terminal_manager.handle_websocket(
+            websocket, terminal_session_key, sandbox_manager,
+            sandbox_session_id=session_id
+        )
+    except WebSocketDisconnect:
+        logger.info(f"Terminal WebSocket disconnected for {terminal_session_key}")
+    except Exception as e:
+        logger.error(f"Terminal WebSocket error for {terminal_session_key}: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        await terminal_manager.cleanup_session(terminal_session_key)
 
 
 @app.get("/api/status")
