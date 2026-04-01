@@ -140,7 +140,6 @@ export function TerminalInstance({ terminalId, isVisible }: TerminalInstanceProp
       if (!mountedRef.current) return;
       setTabConnected(terminalId, true);
       reconnectAttemptRef.current = 0;
-      term.clear();
       startPingInterval();
 
       requestAnimationFrame(() => {
@@ -352,11 +351,15 @@ export function TerminalInstance({ terminalId, isVisible }: TerminalInstanceProp
   // Auto-connect when sandbox is ready
   useEffect(() => {
     if (sandboxStatus === "ready") {
-      const timer = setTimeout(() => {
-        connectWs();
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
+      // Only connect if not already connected
+      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+        const timer = setTimeout(() => {
+          connectWs();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } else if (sandboxStatus === "idle" || sandboxStatus === "error") {
+      // Only tear down on idle (no sandbox) or error — NOT during "creating"
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -365,6 +368,7 @@ export function TerminalInstance({ terminalId, isVisible }: TerminalInstanceProp
       setTabConnected(terminalId, false);
       setTabPid(terminalId, null);
     }
+    // When sandboxStatus === "creating", leave the existing connection untouched
   }, [sandboxStatus, connectWs, setTabConnected, setTabPid, clearPingInterval, terminalId]);
 
   // Cleanup on unmount

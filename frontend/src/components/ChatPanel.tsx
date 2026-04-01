@@ -113,7 +113,6 @@ export function ChatPanel() {
     setIsAgentRunning(true);
     setCurrentIteration(0);
     resetCodeStreaming();
-    setSandboxStatus("idle");
 
     let currentFileCardId: string | null = null;
     let currentThoughtId: string | null = null;
