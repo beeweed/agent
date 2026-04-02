@@ -71,14 +71,14 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
       {/* Tab bar header */}
       <div
         data-design-id="terminal-tab-bar"
-        className="flex items-center bg-[#16161e] border-t border-[#292e42] select-none flex-shrink-0"
+        className="flex items-center bg-[#16161e] border-t border-[#292e42] select-none flex-shrink-0 overflow-hidden"
       >
         {/* Scrollable tabs */}
         <div
           ref={tabsScrollRef}
           data-design-id="terminal-tabs-scroll"
-          className="flex-1 flex items-center overflow-x-auto min-w-0 scrollbar-none"
-          style={{ scrollbarWidth: "none" }}
+          className="flex items-center overflow-x-auto min-w-0 scrollbar-none"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none", flex: "1 1 0%", maxWidth: "calc(100% - 180px)" }}
         >
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
