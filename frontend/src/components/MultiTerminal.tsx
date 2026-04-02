@@ -71,14 +71,14 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
       {/* Tab bar header */}
       <div
         data-design-id="terminal-tab-bar"
-        className="flex items-center bg-[#16161e] border-t border-[#292e42] select-none flex-shrink-0 overflow-hidden"
+        className="flex items-center bg-[#16161e] border-t border-[#292e42] select-none flex-shrink-0 min-w-0"
       >
-        {/* Scrollable tabs */}
+        {/* Scrollable tabs area */}
         <div
           ref={tabsScrollRef}
           data-design-id="terminal-tabs-scroll"
-          className="flex items-center overflow-x-auto min-w-0 scrollbar-none"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none", flex: "1 1 0%", maxWidth: "calc(100% - 180px)" }}
+          className="flex items-center overflow-x-auto min-w-0 flex-1 scrollbar-none"
+          style={{ WebkitOverflowScrolling: "touch" }}
         >
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
@@ -87,11 +87,12 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
                 key={tab.id}
                 data-design-id={`terminal-tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors border-r border-[#292e42] min-w-0 flex-shrink-0 ${
+                className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors border-r border-[#292e42] flex-shrink-0 ${
                   isActive
                     ? "bg-[#1a1b26] text-[#a9b1d6]"
                     : "bg-[#13131a] text-[#565f89] hover:text-[#787c99] hover:bg-[#1a1b26]/50"
                 }`}
+                style={{ minHeight: "auto", minWidth: "auto" }}
               >
                 {/* Active indicator line */}
                 {isActive && (
@@ -124,6 +125,7 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
                     }`}
                     role="button"
                     aria-label={`Close ${tab.name}`}
+                    style={{ minHeight: "auto", minWidth: "auto" }}
                   >
                     <X className="w-3 h-3" />
                   </span>
@@ -133,66 +135,75 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
           })}
         </div>
 
-        {/* Add tab button */}
-        <button
-          data-design-id="terminal-add-tab-btn"
-          onClick={handleAddTab}
-          className="p-1.5 mx-1 rounded hover:bg-[#292e42] text-[#565f89] hover:text-[#a9b1d6] transition-colors flex-shrink-0"
-          title="New Terminal"
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Separator */}
-        <div className="w-px h-4 bg-[#292e42] mx-0.5 flex-shrink-0" />
-
-        {/* Maximize/minimize */}
-        <button
-          data-design-id="terminal-maximize-btn"
-          onClick={toggleMaximize}
-          className="p-1.5 rounded hover:bg-[#292e42] text-[#565f89] hover:text-[#a9b1d6] transition-colors flex-shrink-0"
-          title={isMaximized ? "Restore" : "Maximize"}
-        >
-          {isMaximized ? (
-            <Minimize2 className="w-3 h-3" />
-          ) : (
-            <Maximize2 className="w-3 h-3" />
-          )}
-        </button>
-
-        {/* Connection status */}
+        {/* Fixed action buttons - never scroll, never collapse */}
         <div
-          data-design-id="terminal-connection-status"
-          className="flex items-center gap-1 px-2 flex-shrink-0"
+          data-design-id="terminal-actions"
+          className="flex items-center flex-shrink-0 bg-[#16161e] border-l border-[#292e42]"
         >
-          {isConnected ? (
-            <span data-design-id="terminal-status-connected-icon">
-              <Wifi className="w-3 h-3 text-[#9ece6a]" />
-            </span>
-          ) : (
-            <span data-design-id="terminal-status-disconnected-icon">
-              <WifiOff className="w-3 h-3 text-[#f7768e]" />
-            </span>
-          )}
-          <span
-            data-design-id="terminal-status-label"
-            className={`text-[10px] font-mono ${
-              isConnected ? "text-[#9ece6a]" : "text-[#f7768e]"
-            }`}
-          >
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
-        </div>
-
-        {sandboxStatus === "ready" && (
+          {/* Add tab button */}
           <button
-            data-design-id="terminal-reconnect-btn"
-            className="p-1.5 mr-1 rounded hover:bg-[#292e42] transition-colors flex-shrink-0"
-            title="Reconnect terminal"
+            data-design-id="terminal-add-tab-btn"
+            onClick={handleAddTab}
+            className="p-1.5 mx-0.5 rounded hover:bg-[#292e42] text-[#565f89] hover:text-[#a9b1d6] transition-colors flex-shrink-0"
+            title="New Terminal"
+            style={{ minHeight: "auto", minWidth: "auto" }}
           >
-            <RotateCcw className="w-3 h-3 text-[#565f89] hover:text-[#a9b1d6]" />
+            <Plus className="w-3.5 h-3.5" />
           </button>
-        )}
+
+          {/* Separator */}
+          <div className="w-px h-4 bg-[#292e42] mx-0.5 flex-shrink-0" />
+
+          {/* Maximize/minimize */}
+          <button
+            data-design-id="terminal-maximize-btn"
+            onClick={toggleMaximize}
+            className="p-1.5 rounded hover:bg-[#292e42] text-[#565f89] hover:text-[#a9b1d6] transition-colors flex-shrink-0"
+            title={isMaximized ? "Restore" : "Maximize"}
+            style={{ minHeight: "auto", minWidth: "auto" }}
+          >
+            {isMaximized ? (
+              <Minimize2 className="w-3 h-3" />
+            ) : (
+              <Maximize2 className="w-3 h-3" />
+            )}
+          </button>
+
+          {/* Connection status */}
+          <div
+            data-design-id="terminal-connection-status"
+            className="flex items-center gap-1 px-1.5 flex-shrink-0"
+          >
+            {isConnected ? (
+              <span data-design-id="terminal-status-connected-icon">
+                <Wifi className="w-3 h-3 text-[#9ece6a]" />
+              </span>
+            ) : (
+              <span data-design-id="terminal-status-disconnected-icon">
+                <WifiOff className="w-3 h-3 text-[#f7768e]" />
+              </span>
+            )}
+            <span
+              data-design-id="terminal-status-label"
+              className={`text-[10px] font-mono hidden sm:inline ${
+                isConnected ? "text-[#9ece6a]" : "text-[#f7768e]"
+              }`}
+            >
+              {isConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+
+          {sandboxStatus === "ready" && (
+            <button
+              data-design-id="terminal-reconnect-btn"
+              className="p-1.5 mr-1 rounded hover:bg-[#292e42] transition-colors flex-shrink-0"
+              title="Reconnect terminal"
+              style={{ minHeight: "auto", minWidth: "auto" }}
+            >
+              <RotateCcw className="w-3 h-3 text-[#565f89] hover:text-[#a9b1d6]" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Terminal instances — all mount but only the active one is visible */}

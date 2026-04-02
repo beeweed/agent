@@ -175,6 +175,13 @@
     min-height: 44px;
     min-width: 44px;
   }
+  /* Terminal tab bar buttons should stay compact */
+  [data-design-id="terminal-tab-bar"] button,
+  [data-design-id="terminal-tab-bar"] [role="button"],
+  [data-design-id="terminal-actions"] button {
+    min-height: 32px;
+    min-width: auto;
+  }
 }
 
 /* Custom scrollbar - Light theme */
