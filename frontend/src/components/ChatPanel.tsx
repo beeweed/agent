@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useStore } from "@/store/useStore";
+import { useTerminalStore } from "@/store/useTerminalStore";
 import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
@@ -69,7 +70,7 @@ export function ChatPanel() {
     resetCodeStreaming,
   } = useStore();
   
-  const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent } = useApi();
+  const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent, registerTerminalSession } = useApi();
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -548,12 +549,39 @@ export function ChatPanel() {
             }
             break;
 
+          case "terminal_session_request":
+            {
+              const sessionName = event.session_name || "default";
+              console.log("[TERMINAL_SESSION_REQUEST] Creating terminal for session:", sessionName);
+              const termStore = useTerminalStore.getState();
+              const { tabId } = termStore.findOrCreateTabForSession(sessionName);
+              registerTerminalSession(sessionName, tabId);
+            }
+            break;
+
+          case "terminal_session_switch":
+            {
+              const sessionName = event.session_name || "default";
+              const tabId = event.tab_id || "";
+              console.log("[TERMINAL_SESSION_SWITCH] Switching to session:", sessionName, "tab:", tabId);
+              if (tabId) {
+                useTerminalStore.getState().setActiveTab(tabId);
+              }
+            }
+            break;
+
           case "shell_exec_start":
             {
               const command = event.command || "";
               const sessionName = event.session_name || "default";
               const description = event.description || "Running command";
-              console.log("[SHELL_EXEC_START]", command);
+              console.log("[SHELL_EXEC_START]", command, "session:", sessionName);
+
+              const termStore = useTerminalStore.getState();
+              const existingTab = termStore.getTabIdForSession(sessionName);
+              if (existingTab) {
+                termStore.setActiveTab(existingTab);
+              }
 
               const shellEntry: ChatEntry = {
                 id: crypto.randomUUID(),

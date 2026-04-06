@@ -135,8 +135,11 @@ export interface AgentEvent {
     | "delete_str_from_file_start"
     | "delete_str_from_file_end"
     | "shell_exec_start"
-    | "shell_exec_end";
+    | "shell_exec_end"
+    | "terminal_session_request"
+    | "terminal_session_switch";
   content?: string;
+  tab_id?: string;
   error?: string;
   iteration?: number;
   max_iterations?: number;

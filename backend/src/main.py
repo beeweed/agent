@@ -296,6 +296,21 @@ async def terminal_websocket_multi(websocket: WebSocket, session_id: str, termin
         await terminal_manager.cleanup_session(terminal_session_key)
 
 
+@app.post("/api/terminal/register")
+async def register_terminal_session(request: dict):
+    """
+    Register a mapping from LLM session_name to a frontend terminal tab_id.
+    Called by the frontend when it creates/reuses a terminal tab for the agent.
+    """
+    session_name = request.get("session_name", "")
+    tab_id = request.get("tab_id", "")
+    if not session_name or not tab_id:
+        raise HTTPException(status_code=400, detail="session_name and tab_id are required")
+    
+    terminal_manager.register_session_name(session_name, tab_id)
+    return {"success": True, "session_name": session_name, "tab_id": tab_id}
+
+
 @app.get("/api/status")
 async def get_status(session_id: str = "default"):
     """Get the current agent status."""

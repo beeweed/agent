@@ -214,15 +214,29 @@ async def execute_shell(session_id: str, arguments: dict) -> dict:
     The command is typed into the real terminal (visible in the Computer Panel).
     Output is captured by monitoring PTY data until the shell prompt ('$')
     re-appears, meaning the command has finished. No separate process is spawned.
+
+    Uses the LLM-provided session_name to route to the correct terminal tab.
+    The composite terminal key is: {session_id}__term__{tab_id}
     """
     command = arguments.get("command", "")
+    session_name = arguments.get("session_name", "default")
     wait_for_output = arguments.get("wait_for_output", True)
 
     if not command:
         return {"success": False, "output": "No command provided"}
 
+    tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
+    if tab_id is None:
+        return {
+            "success": False,
+            "output": f"Terminal session '{session_name}' not ready. Waiting for frontend to create it.",
+            "error": "Terminal not ready",
+        }
+
+    terminal_key = f"{session_id}__term__{tab_id}"
+
     result = await terminal_manager.execute_in_terminal(
-        session_id,
+        terminal_key,
         command,
         sandbox_manager,
         wait_for_output=wait_for_output,

@@ -8,6 +8,10 @@ and all PTY features a real VS Code terminal would support.
 
 Shell tool commands are executed exclusively through the PTY terminal.
 Output is captured by monitoring PTY data until the shell prompt appears.
+
+Session-name-aware: the LLM provides a session_name with each shell call.
+The manager maps that to a frontend terminal tab and waits for the tab's
+WebSocket PTY to be fully initialized before running the command.
 """
 
 import asyncio
@@ -26,6 +30,7 @@ logger = logging.getLogger(__name__)
 PING_INTERVAL_SEC = 15
 COMMAND_TIMEOUT_SEC = 180  # 3 minutes
 SHELL_COMMAND_TIMEOUT_SEC = 120  # 2 minutes max for a single command
+TERMINAL_READY_TIMEOUT_SEC = 30  # max wait for frontend terminal to connect
 
 ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[.*?[@-~]|\r')
 
@@ -99,13 +104,68 @@ class TerminalManager:
     """
     Manages multiple PTY terminal sessions.
 
-    Each sandbox session can have one active PTY terminal.
-    The terminal is a real bash shell running inside the E2B sandbox,
-    with full PTY support (colors, cursor, signals, job control, TUI apps).
+    Each sandbox session can have multiple PTY terminals, each identified
+    by the LLM's session_name. The manager keeps a mapping from
+    session_name → terminal tab id and uses asyncio.Event objects to
+    coordinate between the agent (which needs to run a command) and
+    the frontend (which connects the WebSocket PTY).
     """
 
     def __init__(self):
         self.sessions: Dict[str, TerminalSession] = {}
+        self._ready_events: Dict[str, asyncio.Event] = {}
+        self._session_name_to_tab: Dict[str, str] = {}
+
+    def get_terminal_key_for_session_name(self, sandbox_session_id: str, session_name: str) -> Optional[str]:
+        """Return the composite terminal key if session_name is already mapped."""
+        tab_id = self._session_name_to_tab.get(session_name)
+        if tab_id is None:
+            return None
+        return f"{sandbox_session_id}__term__{tab_id}"
+
+    def register_session_name(self, session_name: str, tab_id: str):
+        """Map a session_name to a terminal tab id."""
+        self._session_name_to_tab[session_name] = tab_id
+        logger.info(f"Registered session_name '{session_name}' → tab '{tab_id}'")
+
+    def is_session_name_known(self, session_name: str) -> bool:
+        """Check if a session_name is already mapped to a terminal tab."""
+        return session_name in self._session_name_to_tab
+
+    def get_tab_id_for_session_name(self, session_name: str) -> Optional[str]:
+        """Return the tab id for a session_name, or None."""
+        return self._session_name_to_tab.get(session_name)
+
+    def create_ready_event(self, terminal_key: str) -> asyncio.Event:
+        """Create (or reset) a readiness event for a terminal key."""
+        event = asyncio.Event()
+        self._ready_events[terminal_key] = event
+        logger.info(f"Created ready event for terminal key '{terminal_key}'")
+        return event
+
+    def signal_ready(self, terminal_key: str):
+        """Signal that a terminal session is fully initialized and ready."""
+        event = self._ready_events.get(terminal_key)
+        if event:
+            event.set()
+            logger.info(f"Terminal ready signal set for '{terminal_key}'")
+
+    async def wait_for_ready(self, terminal_key: str, timeout: int = TERMINAL_READY_TIMEOUT_SEC) -> bool:
+        """Wait until the terminal session is ready (PTY connected)."""
+        event = self._ready_events.get(terminal_key)
+        if event is None:
+            event = self.create_ready_event(terminal_key)
+
+        session = self.sessions.get(terminal_key)
+        if session and session.is_active:
+            return True
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+            return True
+        except asyncio.TimeoutError:
+            logger.warning(f"Timed out waiting for terminal '{terminal_key}' to be ready")
+            return False
 
     async def handle_websocket(
         self,
@@ -183,6 +243,8 @@ class TerminalManager:
                 "type": "connected",
                 "pid": pty_handle.pid,
             })
+
+            self.signal_ready(session_id)
 
             # Start the ping/keepalive task
             ping_task = asyncio.create_task(
@@ -293,8 +355,12 @@ class TerminalManager:
         Output is captured by buffering PTY data until the shell prompt
         (ending with '$' or '#') re-appears, indicating the command finished.
 
+        If the terminal session is not yet ready (e.g. frontend is still
+        connecting the WebSocket), this method waits for the ready event
+        before proceeding — no time-based delays.
+
         Args:
-            session_id: Session identifier
+            session_id: Terminal session key (composite key)
             command: The shell command to execute
             sandbox_manager: Reference to sandbox manager for PTY access
             timeout: Max seconds to wait for the command to finish
@@ -305,17 +371,29 @@ class TerminalManager:
         """
         session = self.sessions.get(session_id)
         if not session or not session.is_active or not session.pid:
-            logger.warning(f"No active terminal session for {session_id}, cannot execute command")
-            return {
-                "success": False,
-                "output": "No active terminal session. Terminal may not be connected.",
-                "error": "No active terminal session",
-            }
+            logger.info(f"Terminal '{session_id}' not active yet, waiting for ready signal...")
+            ready = await self.wait_for_ready(session_id)
+            if not ready:
+                logger.warning(f"Terminal '{session_id}' never became ready")
+                return {
+                    "success": False,
+                    "output": "Terminal session timed out waiting to initialize.",
+                    "error": "Terminal not ready",
+                }
+            session = self.sessions.get(session_id)
+            if not session or not session.is_active or not session.pid:
+                logger.warning(f"Terminal '{session_id}' still not active after ready signal")
+                return {
+                    "success": False,
+                    "output": "No active terminal session after initialization.",
+                    "error": "No active terminal session",
+                }
 
+        sandbox_base = session_id.split("__term__")[0] if "__term__" in session_id else session_id
         try:
-            sandbox = await sandbox_manager.get_sandbox(session_id)
+            sandbox = await sandbox_manager.get_sandbox(sandbox_base)
             if not sandbox:
-                logger.warning(f"No sandbox found for {session_id}")
+                logger.warning(f"No sandbox found for {sandbox_base}")
                 return {
                     "success": False,
                     "output": "No sandbox found for session.",

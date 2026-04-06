@@ -5,12 +5,14 @@ export interface TerminalTab {
   name: string;
   connected: boolean;
   pid: number | null;
+  sessionName?: string;
 }
 
 interface TerminalStoreState {
   tabs: TerminalTab[];
   activeTabId: string;
   nextIndex: number;
+  sessionNameToTabId: Record<string, string>;
 
   addTab: () => string;
   removeTab: (id: string) => void;
@@ -18,6 +20,8 @@ interface TerminalStoreState {
   renameTab: (id: string, name: string) => void;
   setTabConnected: (id: string, connected: boolean) => void;
   setTabPid: (id: string, pid: number | null) => void;
+  findOrCreateTabForSession: (sessionName: string) => { tabId: string; isNew: boolean };
+  getTabIdForSession: (sessionName: string) => string | null;
 }
 
 const INITIAL_TAB: TerminalTab = {
@@ -31,6 +35,7 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
   tabs: [INITIAL_TAB],
   activeTabId: INITIAL_TAB.id,
   nextIndex: 1,
+  sessionNameToTabId: {},
 
   addTab: () => {
     const { nextIndex, tabs } = get();
@@ -85,5 +90,54 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, pid } : t)),
     }));
+  },
+
+  getTabIdForSession: (sessionName: string) => {
+    const { sessionNameToTabId } = get();
+    return sessionNameToTabId[sessionName] ?? null;
+  },
+
+  findOrCreateTabForSession: (sessionName: string) => {
+    const { sessionNameToTabId, tabs, nextIndex } = get();
+
+    const existingTabId = sessionNameToTabId[sessionName];
+    if (existingTabId) {
+      const tabExists = tabs.some((t) => t.id === existingTabId);
+      if (tabExists) {
+        set({ activeTabId: existingTabId });
+        return { tabId: existingTabId, isNew: false };
+      }
+    }
+
+    const assignedTabIds = new Set(Object.values(sessionNameToTabId));
+    const unassignedTab = tabs.find((t) => !t.sessionName && !assignedTabIds.has(t.id));
+
+    if (unassignedTab) {
+      const updatedTabs = tabs.map((t) =>
+        t.id === unassignedTab.id ? { ...t, name: sessionName, sessionName } : t
+      );
+      set({
+        tabs: updatedTabs,
+        activeTabId: unassignedTab.id,
+        sessionNameToTabId: { ...sessionNameToTabId, [sessionName]: unassignedTab.id },
+      });
+      return { tabId: unassignedTab.id, isNew: false };
+    }
+
+    const id = `term_${nextIndex}`;
+    const newTab: TerminalTab = {
+      id,
+      name: sessionName,
+      connected: false,
+      pid: null,
+      sessionName,
+    };
+    set({
+      tabs: [...tabs, newTab],
+      activeTabId: id,
+      nextIndex: nextIndex + 1,
+      sessionNameToTabId: { ...sessionNameToTabId, [sessionName]: id },
+    });
+    return { tabId: id, isNew: true };
   },
 }));

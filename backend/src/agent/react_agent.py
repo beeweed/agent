@@ -25,6 +25,7 @@ from .tool_schemas import TOOL_SCHEMAS
 from .tool_executor import TOOL_EXECUTORS
 from ..services.openrouter import chat_completion
 from ..services.e2b_sandbox import sandbox_manager
+from ..services.terminal_manager import terminal_manager
 
 
 class StreamingToolParser:
@@ -346,8 +347,72 @@ class ReActAgent:
                         for evt in self._emit_tool_start_events(tool_name, tool_id, arguments):
                             yield evt
 
-                        # --- Execute tool ---
-                        if tool_name in TOOL_EXECUTORS:
+                        # --- Shell tool: coordinate terminal session ---
+                        if tool_name == "shell":
+                            session_name = arguments.get("session_name", "default")
+                            need_new = not terminal_manager.is_session_name_known(session_name)
+
+                            if need_new:
+                                yield {
+                                    "type": "terminal_session_request",
+                                    "session_name": session_name,
+                                    "iteration": self.current_iteration,
+                                }
+
+                                tab_id = None
+                                for _ in range(300):
+                                    tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
+                                    if tab_id is not None:
+                                        break
+                                    await asyncio.sleep(0.1)
+
+                                if tab_id is None:
+                                    result = {
+                                        "success": False,
+                                        "output": f"Frontend did not create terminal for session '{session_name}'.",
+                                        "error": "Terminal creation timed out",
+                                    }
+                                else:
+                                    terminal_key = f"{self.session_id}__term__{tab_id}"
+                                    existing = terminal_manager.sessions.get(terminal_key)
+                                    if existing and existing.is_active:
+                                        result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
+                                    else:
+                                        terminal_manager.create_ready_event(terminal_key)
+                                        ready = await terminal_manager.wait_for_ready(terminal_key)
+                                        if not ready:
+                                            result = {
+                                                "success": False,
+                                                "output": f"Terminal '{session_name}' timed out during initialization.",
+                                                "error": "Terminal init timeout",
+                                            }
+                                        else:
+                                            result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
+                            else:
+                                tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
+                                terminal_key = f"{self.session_id}__term__{tab_id}"
+                                yield {
+                                    "type": "terminal_session_switch",
+                                    "session_name": session_name,
+                                    "tab_id": tab_id,
+                                    "iteration": self.current_iteration,
+                                }
+                                session = terminal_manager.sessions.get(terminal_key)
+                                if session and session.is_active:
+                                    result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
+                                else:
+                                    ready = await terminal_manager.wait_for_ready(terminal_key)
+                                    if ready:
+                                        result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
+                                    else:
+                                        result = {
+                                            "success": False,
+                                            "output": f"Terminal '{session_name}' not active.",
+                                            "error": "Terminal not active",
+                                        }
+
+                        # --- Execute tool (non-shell) ---
+                        elif tool_name in TOOL_EXECUTORS:
                             result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                         else:
                             result = {"success": False, "error": f"Unknown tool: {tool_name}"}
