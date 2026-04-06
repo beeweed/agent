@@ -3,6 +3,7 @@ import type { ChatEntry } from "@/types";
 import { useStore } from "@/store/useStore";
 import { Code, Eye, Check, Loader2, AlertCircle, BookOpen, Replace, Plus, Trash2, Eraser, TerminalSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { MessageContent } from "./MessageContent";
+import { InlineShellTerminal } from "./InlineShellTerminal";
 
 function AnygentLogo() {
   return (
@@ -410,6 +411,9 @@ function ShellToolBlock({ entry }: { entry: ChatEntry }) {
   const output = entry.shellResult?.output || "";
   const exitCode = entry.shellResult?.exit_code;
 
+  const { sandboxStatus } = useStore();
+  const showTerminal = sandboxStatus === "ready" || sandboxStatus === "creating";
+
   return (
     <div data-design-id={`shell-card-${entry.id}`} className="animate-fade-in pl-6 xs:pl-8 sm:pl-10">
       <div
@@ -534,6 +538,15 @@ function ShellToolBlock({ entry }: { entry: ChatEntry }) {
           </div>
         )}
       </div>
+
+      {/* Inline terminal rendered below the command block */}
+      {showTerminal && (
+        <InlineShellTerminal
+          sessionName={entry.shellSessionName || "term_0"}
+          shellEntryId={entry.id}
+          shellStatus={entry.shellStatus}
+        />
+      )}
     </div>
   );
 }
