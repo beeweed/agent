@@ -53,6 +53,9 @@ class TerminalSession:
         self._capture_buffer: list[bytes] = []
         self._capturing = False
         self._capture_event: Optional[asyncio.Event] = None
+        # Persistent output buffer for BashView (append-only, never cleared by capture)
+        self._output_buffer: list[bytes] = []
+        self._command_running = False
 
     @property
     def is_active(self) -> bool:
@@ -77,6 +80,8 @@ class TerminalSession:
         return raw.decode("utf-8", errors="replace")
 
     def append_capture(self, data: bytes):
+        # Always append to persistent output buffer for BashView
+        self._output_buffer.append(data)
         if self._capturing:
             self._capture_buffer.append(data)
             raw_so_far = b"".join(self._capture_buffer).decode("utf-8", errors="replace")
@@ -85,9 +90,15 @@ class TerminalSession:
             for line in lines[-3:]:
                 stripped = line.strip()
                 if stripped.endswith("$") or stripped.endswith("$ ") or stripped.endswith("#") or stripped.endswith("# "):
+                    self._command_running = False
                     if self._capture_event:
                         self._capture_event.set()
                     return
+
+    def get_output_snapshot(self) -> str:
+        """Return the full persistent output buffer as a string (non-blocking)."""
+        raw = b"".join(self._output_buffer)
+        return raw.decode("utf-8", errors="replace")
 
     async def safe_send(self, data: dict) -> bool:
         if not self.websocket or not self._active:
@@ -401,6 +412,7 @@ class TerminalManager:
                 }
 
             if not wait_for_output:
+                session._command_running = True
                 command_bytes = (command + "\n").encode("utf-8")
                 await sandbox.pty.send_stdin(session.pid, command_bytes)
                 return {
@@ -408,6 +420,7 @@ class TerminalManager:
                     "output": "Command started in background (no output captured).",
                 }
 
+            session._command_running = True
             session.start_capture()
 
             command_bytes = (command + "\n").encode("utf-8")
@@ -435,6 +448,7 @@ class TerminalManager:
 
             await asyncio.sleep(0.1)
 
+            session._command_running = False
             raw_output = session.stop_capture()
             cleaned = strip_ansi(raw_output)
 
@@ -464,6 +478,35 @@ class TerminalManager:
                 "output": str(e),
                 "error": str(e),
             }
+
+    def view_session_output(self, session_name: str) -> dict:
+        """
+        Return the current output buffer for a named session (non-blocking).
+        Used by the BashView tool. Strictly read-only — never executes commands.
+        """
+        tab_id = self._session_name_to_tab.get(session_name)
+        if tab_id is None:
+            return {"error": "Session not found", "session_name": session_name}
+
+        # Try every sandbox prefix to find the matching terminal key
+        session: Optional[TerminalSession] = None
+        for key, sess in self.sessions.items():
+            if key.endswith(f"__term__{tab_id}"):
+                session = sess
+                break
+
+        if session is None:
+            return {"error": "Session not found", "session_name": session_name}
+
+        raw_output = session.get_output_snapshot()
+        cleaned = strip_ansi(raw_output).strip()
+        status = "running" if session._command_running else "completed"
+
+        return {
+            "session_name": session_name,
+            "status": status,
+            "output": cleaned if cleaned else "no output",
+        }
 
     async def cleanup_session(self, session_id: str):
         """Clean up terminal session resources."""

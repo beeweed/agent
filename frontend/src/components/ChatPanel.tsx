@@ -5,7 +5,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult, ShellResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult, ShellResult, BashViewResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -123,6 +123,7 @@ export function ChatPanel() {
     let currentDeleteLinesCardId: string | null = null;
     let currentDeleteStrCardId: string | null = null;
     let currentShellCardId: string | null = null;
+    let currentBashViewCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -549,6 +550,39 @@ export function ChatPanel() {
             }
             break;
 
+          case "bash_view_start":
+            {
+              const sessionName = event.session_name || "";
+              console.log("[BASH_VIEW_START]", sessionName);
+
+              const bashViewEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "bash_view_card",
+                bashViewSessionName: sessionName,
+                bashViewStatus: "viewing",
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              currentBashViewCardId = bashViewEntry.id;
+              addChatEntry(bashViewEntry);
+            }
+            break;
+
+          case "bash_view_end":
+            {
+              const result = event.result as BashViewResult;
+              console.log("[BASH_VIEW_END]", result?.session_name, result?.status);
+
+              if (currentBashViewCardId) {
+                updateChatEntry(currentBashViewCardId, {
+                  bashViewStatus: result?.error ? "error" : "viewed",
+                  bashViewResult: result,
+                });
+                currentBashViewCardId = null;
+              }
+            }
+            break;
+
           case "terminal_session_request":
             {
               const sessionName = event.session_name || "default";
@@ -644,6 +678,10 @@ export function ChatPanel() {
             if (currentShellCardId) {
               updateChatEntry(currentShellCardId, { shellStatus: "error" });
               currentShellCardId = null;
+            }
+            if (currentBashViewCardId) {
+              updateChatEntry(currentBashViewCardId, { bashViewStatus: "error" });
+              currentBashViewCardId = null;
             }
             setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;

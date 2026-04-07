@@ -103,6 +103,14 @@ export interface ShellResult {
   error?: string;
 }
 
+export interface BashViewResult {
+  success?: boolean;
+  session_name: string;
+  status?: "running" | "completed";
+  output?: string;
+  error?: string;
+}
+
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -137,7 +145,9 @@ export interface AgentEvent {
     | "shell_exec_start"
     | "shell_exec_end"
     | "terminal_session_request"
-    | "terminal_session_switch";
+    | "terminal_session_switch"
+    | "bash_view_start"
+    | "bash_view_end";
   content?: string;
   tab_id?: string;
   error?: string;
@@ -146,7 +156,7 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult | ShellResult;
+  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult | ShellResult | BashViewResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -196,7 +206,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card" | "shell_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card" | "shell_card" | "bash_view_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
@@ -224,4 +234,7 @@ export interface ChatEntry {
   shellSessionName?: string;  // For shell tool
   shellDescription?: string;  // For shell tool
   shellStatus?: "running" | "completed" | "error";  // For shell tool
+  bashViewSessionName?: string;  // For BashView tool
+  bashViewStatus?: "viewing" | "viewed" | "error";  // For BashView tool
+  bashViewResult?: BashViewResult;  // For BashView tool
 }

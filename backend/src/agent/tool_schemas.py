@@ -169,4 +169,21 @@ TOOL_SCHEMAS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "BashView",
+            "description": "View the current output of a bash session. Returns partial output if the command is still running. Read-only — never executes commands.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_name": {
+                        "type": "string",
+                        "description": "The session name to fetch output from."
+                    }
+                },
+                "required": ["session_name"]
+            }
+        }
+    },
 ]

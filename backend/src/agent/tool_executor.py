@@ -207,6 +207,19 @@ async def execute_delete_str(session_id: str, arguments: dict) -> dict:
     }
 
 
+async def execute_bash_view(session_id: str, arguments: dict) -> dict:
+    """
+    Return the current output buffer for a named terminal session.
+    Strictly read-only — never executes commands.
+    Returns immediately with whatever output is currently in the buffer.
+    """
+    session_name = arguments.get("session_name", "")
+    if not session_name:
+        return {"error": "No session_name provided", "session_name": ""}
+
+    return terminal_manager.view_session_output(session_name)
+
+
 async def execute_shell(session_id: str, arguments: dict) -> dict:
     """
     Execute a shell command exclusively through the PTY terminal.
@@ -257,4 +270,5 @@ TOOL_EXECUTORS: Dict[str, Callable[..., Awaitable[dict]]] = {
     "delete_lines": execute_delete_lines,
     "delete_str": execute_delete_str,
     "shell": execute_shell,
+    "BashView": execute_bash_view,
 }

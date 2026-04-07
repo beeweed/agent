@@ -535,6 +535,14 @@ class ReActAgent:
                 "target_str": arguments.get("target_str", ""),
                 "iteration": it,
             }
+        elif tool_name == "BashView":
+            yield {
+                "type": "bash_view_start",
+                "tool_id": tool_id,
+                "tool_name": tool_name,
+                "session_name": arguments.get("session_name", ""),
+                "iteration": it,
+            }
 
     def _emit_tool_end_events(self, tool_name: str, tool_id: str, arguments: dict, result: dict):
         """Yield end events so frontend can update UI cards with results."""
@@ -599,6 +607,15 @@ class ReActAgent:
                 "tool_name": tool_name,
                 "file_path": arguments.get("file_path", ""),
                 "target_str": arguments.get("target_str", ""),
+                "result": result,
+                "iteration": it,
+            }
+        elif tool_name == "BashView":
+            yield {
+                "type": "bash_view_end",
+                "tool_id": tool_id,
+                "tool_name": tool_name,
+                "session_name": arguments.get("session_name", ""),
                 "result": result,
                 "iteration": it,
             }
