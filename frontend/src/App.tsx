@@ -111,32 +111,44 @@ function App() {
               </div>
             </div>
             
-            <div className="flex-1 overflow-hidden">
-              {rightPanel === "computer" ? (
+            <div className="flex-1 overflow-hidden relative">
+              <div
+                className="absolute inset-0"
+                style={{ display: rightPanel === "computer" ? "flex" : "none" }}
+              >
                 <ComputerPanel />
-              ) : (
+              </div>
+              <div
+                className="absolute inset-0"
+                style={{ display: rightPanel === "files" ? "flex" : "none" }}
+              >
                 <FilePanel />
-              )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div data-design-id="mobile-layout" className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {mobileTab === "chat" ? (
-            <div className="h-full overflow-hidden px-2 xs:px-3 sm:px-4">
-              <ChatPanel />
-            </div>
-          ) : mobileTab === "computer" ? (
-            <div className="h-full overflow-hidden">
-              <ComputerPanel />
-            </div>
-          ) : (
-            <div className="h-full overflow-hidden">
-              <FilePanel />
-            </div>
-          )}
+        <div className="flex-1 min-h-0 overflow-hidden relative">
+          <div
+            className="absolute inset-0 overflow-hidden px-2 xs:px-3 sm:px-4"
+            style={{ display: mobileTab === "chat" ? "flex" : "none" }}
+          >
+            <ChatPanel />
+          </div>
+          <div
+            className="absolute inset-0 overflow-hidden"
+            style={{ display: mobileTab === "computer" ? "flex" : "none" }}
+          >
+            <ComputerPanel />
+          </div>
+          <div
+            className="absolute inset-0 overflow-hidden"
+            style={{ display: mobileTab === "files" ? "flex" : "none" }}
+          >
+            <FilePanel />
+          </div>
         </div>
 
         <div data-design-id="mobile-tab-bar" className="flex-shrink-0 flex h-12 xs:h-14 bg-card border-t border-border safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">

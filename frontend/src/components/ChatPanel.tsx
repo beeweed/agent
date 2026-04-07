@@ -757,7 +757,7 @@ export function ChatPanel() {
   return (
     <div 
       data-design-id="chat-panel"
-      className="flex flex-col h-full overflow-hidden"
+      className="flex flex-col h-full w-full overflow-hidden"
     >
       <div 
         data-design-id="chat-header"

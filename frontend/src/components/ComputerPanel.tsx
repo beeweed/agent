@@ -315,7 +315,7 @@ export function ComputerPanel() {
   };
 
   return (
-    <div ref={containerRef} data-design-id="computer-panel" className="flex flex-col h-full overflow-hidden">
+    <div ref={containerRef} data-design-id="computer-panel" className="flex flex-col h-full w-full overflow-hidden">
       <div data-design-id="computer-header" className="p-2 xs:p-3 sm:p-4 border-b border-border flex-shrink-0">
         <div className="flex justify-between items-center mb-1.5 xs:mb-2 sm:mb-3">
           <h2 data-design-id="computer-title" className="font-medium text-foreground text-xs xs:text-sm sm:text-base">

@@ -68,7 +68,7 @@ export function FilePanel() {
   const hasFiles = fileTree && fileTree.children && fileTree.children.length > 0;
 
   return (
-    <div data-design-id="file-panel" className="flex flex-col sm:flex-row h-full">
+    <div data-design-id="file-panel" className="flex flex-col sm:flex-row h-full w-full">
       <div data-design-id="file-explorer" className="w-full sm:w-40 md:w-48 lg:w-56 h-[30%] xs:h-[35%] sm:h-full bg-secondary/50 border-b sm:border-b-0 sm:border-r border-border flex flex-col flex-shrink-0">
         <div className="flex items-center justify-between px-2 xs:px-3 py-2 xs:py-3 border-b border-border">
           <div className="flex items-center gap-1.5 xs:gap-2">
