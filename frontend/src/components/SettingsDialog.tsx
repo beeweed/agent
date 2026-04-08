@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Box, Key, Layers, Plus, ChevronDown, Zap } from "lucide-react";
+import { Box, Key, Layers, Plus, ChevronDown, Zap, Flame } from "lucide-react";
 import { SandboxCreatorDialog } from "@/components/SandboxCreatorDialog";
 
 const PROVIDERS: { id: Provider; name: string; icon: React.ReactNode; color: string; description: string; keyPrefix: string; keyUrl: string; keyLabel: string }[] = [
@@ -34,6 +34,16 @@ const PROVIDERS: { id: Provider; name: string; icon: React.ReactNode; color: str
     keyUrl: "https://console.groq.com/keys",
     keyLabel: "Groq API Key",
   },
+  {
+    id: "fireworks",
+    name: "Fireworks AI",
+    icon: <Flame className="w-4 h-4" />,
+    color: "text-orange-500",
+    description: "Blazing-fast inference — Llama, Qwen, DeepSeek, Kimi & more",
+    keyPrefix: "fw_...",
+    keyUrl: "https://fireworks.ai/account/api-keys",
+    keyLabel: "Fireworks API Key",
+  },
 ];
 
 export function SettingsDialog() {
@@ -46,6 +56,8 @@ export function SettingsDialog() {
     setApiKey,
     groqApiKey,
     setGroqApiKey,
+    fireworksApiKey,
+    setFireworksApiKey,
     e2bApiKey,
     setE2bApiKey,
     e2bTemplateId,
@@ -58,6 +70,7 @@ export function SettingsDialog() {
   const [localProvider, setLocalProvider] = useState<Provider>(provider);
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localGroqApiKey, setLocalGroqApiKey] = useState(groqApiKey);
+  const [localFireworksApiKey, setLocalFireworksApiKey] = useState(fireworksApiKey);
   const [localE2bApiKey, setLocalE2bApiKey] = useState(e2bApiKey);
   const [localE2bTemplateId, setLocalE2bTemplateId] = useState(e2bTemplateId);
   const [isSandboxCreatorOpen, setIsSandboxCreatorOpen] = useState(false);
@@ -71,9 +84,10 @@ export function SettingsDialog() {
     setLocalProvider(provider);
     setLocalApiKey(apiKey);
     setLocalGroqApiKey(groqApiKey);
+    setLocalFireworksApiKey(fireworksApiKey);
     setLocalE2bApiKey(e2bApiKey);
     setLocalE2bTemplateId(e2bTemplateId);
-  }, [provider, apiKey, groqApiKey, e2bApiKey, e2bTemplateId]);
+  }, [provider, apiKey, groqApiKey, fireworksApiKey, e2bApiKey, e2bTemplateId]);
 
   useEffect(() => {
     if (isSettingsOpen && getActiveApiKey() && models.length === 0) {
@@ -83,7 +97,9 @@ export function SettingsDialog() {
   }, [isSettingsOpen]);
 
   const getActiveApiKey = () => {
-    return localProvider === "groq" ? localGroqApiKey : localApiKey;
+    if (localProvider === "groq") return localGroqApiKey;
+    if (localProvider === "fireworks") return localFireworksApiKey;
+    return localApiKey;
   };
 
   const selectedProviderConfig = PROVIDERS.find(p => p.id === localProvider) || PROVIDERS[0];
@@ -92,11 +108,14 @@ export function SettingsDialog() {
     const providerChanged = localProvider !== provider;
     const apiKeyChanged = localProvider === "openrouter" 
       ? localApiKey !== apiKey 
-      : localGroqApiKey !== groqApiKey;
+      : localProvider === "fireworks"
+        ? localFireworksApiKey !== fireworksApiKey
+        : localGroqApiKey !== groqApiKey;
 
     setProvider(localProvider);
     setApiKey(localApiKey);
     setGroqApiKey(localGroqApiKey);
+    setFireworksApiKey(localFireworksApiKey);
     setE2bApiKey(localE2bApiKey);
     setE2bTemplateId(localE2bTemplateId);
 
@@ -150,7 +169,7 @@ export function SettingsDialog() {
                 className="w-full flex items-center justify-between bg-muted rounded-xl p-4 border border-border hover:border-primary/50 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg ${localProvider === 'groq' ? 'bg-emerald-500/15' : 'bg-blue-500/15'}`}>
+                  <div className={`p-1.5 rounded-lg ${localProvider === 'groq' ? 'bg-emerald-500/15' : localProvider === 'fireworks' ? 'bg-orange-500/15' : 'bg-blue-500/15'}`}>
                     <span className={selectedProviderConfig.color}>
                       {selectedProviderConfig.icon}
                     </span>
@@ -180,7 +199,7 @@ export function SettingsDialog() {
                         localProvider === p.id ? 'bg-primary/10' : ''
                       }`}
                     >
-                      <div className={`p-1.5 rounded-lg ${p.id === 'groq' ? 'bg-emerald-500/15' : 'bg-blue-500/15'}`}>
+                      <div className={`p-1.5 rounded-lg ${p.id === 'groq' ? 'bg-emerald-500/15' : p.id === 'fireworks' ? 'bg-orange-500/15' : 'bg-blue-500/15'}`}>
                         <span className={p.color}>{p.icon}</span>
                       </div>
                       <div className="flex-1">
@@ -258,6 +277,41 @@ export function SettingsDialog() {
                 className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:underline"
               >
                 Get your Groq API key
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          )}
+
+          {/* Fireworks API Key Section - shown when fireworks is selected */}
+          {localProvider === "fireworks" && (
+            <div data-design-id="fireworks-api-key-section" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <label className="text-sm font-medium text-foreground">Fireworks API Key</label>
+              </div>
+              <div className="bg-muted rounded-xl p-4 border border-border">
+                <Input
+                  data-design-id="fireworks-api-key-input"
+                  type="password"
+                  placeholder="fw_..."
+                  value={localFireworksApiKey}
+                  onChange={(e) => setLocalFireworksApiKey(e.target.value)}
+                  className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Flame className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-500/60" />
+                <span>Fireworks AI offers blazing-fast inference for 100+ models with full tool/function calling support.</span>
+              </div>
+              <a
+                href="https://fireworks.ai/account/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-orange-500 hover:underline"
+              >
+                Get your Fireworks API key
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>

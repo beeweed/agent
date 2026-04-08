@@ -25,6 +25,7 @@ from .tool_schemas import TOOL_SCHEMAS
 from .tool_executor import TOOL_EXECUTORS
 from ..services.openrouter import chat_completion as openrouter_chat_completion
 from ..services.groq import chat_completion as groq_chat_completion
+from ..services.fireworks import chat_completion as fireworks_chat_completion
 from ..services.e2b_sandbox import sandbox_manager
 from ..services.terminal_manager import terminal_manager
 
@@ -247,7 +248,12 @@ class ReActAgent:
                 streaming_started: dict[int, bool] = {}
                 thought_stream_started = False
 
-                chat_fn = groq_chat_completion if self.provider == "groq" else openrouter_chat_completion
+                if self.provider == "groq":
+                    chat_fn = groq_chat_completion
+                elif self.provider == "fireworks":
+                    chat_fn = fireworks_chat_completion
+                else:
+                    chat_fn = openrouter_chat_completion
 
                 async for chunk_event in chat_fn(
                     api_key=self.api_key,

@@ -10,6 +10,7 @@ import logging
 from .agent.react_agent import ReActAgent
 from .services.openrouter import fetch_models as openrouter_fetch_models
 from .services.groq import fetch_models as groq_fetch_models
+from .services.fireworks import fetch_models as fireworks_fetch_models
 from .services.e2b_sandbox import sandbox_manager
 from .services.terminal_manager import terminal_manager
 
@@ -63,6 +64,8 @@ async def get_models(request: ModelsRequest):
     provider = request.provider or "openrouter"
     if provider == "groq":
         result = await groq_fetch_models(request.api_key)
+    elif provider == "fireworks":
+        result = await fireworks_fetch_models(request.api_key)
     else:
         result = await openrouter_fetch_models(request.api_key)
     if not result.get("success"):

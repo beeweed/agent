@@ -22,6 +22,7 @@ export function useApi() {
     provider,
     apiKey,
     groqApiKey,
+    fireworksApiKey,
     e2bApiKey,
     e2bTemplateId,
     selectedModel,
@@ -32,11 +33,13 @@ export function useApi() {
   } = useStore();
 
   const getActiveApiKey = useCallback(() => {
-    return provider === "groq" ? groqApiKey : apiKey;
-  }, [provider, apiKey, groqApiKey]);
+    if (provider === "groq") return groqApiKey;
+    if (provider === "fireworks") return fireworksApiKey;
+    return apiKey;
+  }, [provider, apiKey, groqApiKey, fireworksApiKey]);
 
   const fetchModels = useCallback(async () => {
-    const activeKey = provider === "groq" ? groqApiKey : apiKey;
+    const activeKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
     if (!activeKey) return;
     
     setModelsLoading(true);
@@ -59,11 +62,11 @@ export function useApi() {
     } finally {
       setModelsLoading(false);
     }
-  }, [provider, apiKey, groqApiKey, setModels, setModelsLoading]);
+  }, [provider, apiKey, groqApiKey, fireworksApiKey, setModels, setModelsLoading]);
 
   const sendMessage = useCallback(
     async (message: string, onEvent: (event: AgentEvent) => void) => {
-      const activeKey = provider === "groq" ? groqApiKey : apiKey;
+      const activeKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
 
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
@@ -108,7 +111,7 @@ export function useApi() {
         }
       }
     },
-    [provider, apiKey, groqApiKey, e2bApiKey, e2bTemplateId, selectedModel]
+    [provider, apiKey, groqApiKey, fireworksApiKey, e2bApiKey, e2bTemplateId, selectedModel]
   );
 
   const fetchFileTree = useCallback(async () => {

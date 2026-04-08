@@ -27,7 +27,7 @@ export interface CodeStreamingState {
 }
 
 export type SandboxStatus = "idle" | "creating" | "ready" | "error";
-export type Provider = "openrouter" | "groq";
+export type Provider = "openrouter" | "groq" | "fireworks";
 
 interface AppState {
   provider: Provider;
@@ -38,6 +38,9 @@ interface AppState {
   
   groqApiKey: string;
   setGroqApiKey: (key: string) => void;
+  
+  fireworksApiKey: string;
+  setFireworksApiKey: (key: string) => void;
   
   e2bApiKey: string;
   setE2bApiKey: (key: string) => void;
@@ -142,6 +145,9 @@ export const useStore = create<AppState>()(
       groqApiKey: "",
       setGroqApiKey: (key) => set({ groqApiKey: key }),
       
+      fireworksApiKey: "",
+      setFireworksApiKey: (key) => set({ fireworksApiKey: key }),
+      
       e2bApiKey: "",
       setE2bApiKey: (key) => set({ e2bApiKey: key }),
       
@@ -243,6 +249,7 @@ export const useStore = create<AppState>()(
         provider: state.provider,
         apiKey: state.apiKey,
         groqApiKey: state.groqApiKey,
+        fireworksApiKey: state.fireworksApiKey,
         e2bApiKey: state.e2bApiKey,
         e2bTemplateId: state.e2bTemplateId,
         selectedModel: state.selectedModel,

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
-import { ChevronDown, Search, Check, Loader2, Zap, Key } from "lucide-react";
+import { ChevronDown, Search, Check, Loader2, Zap, Key, Flame } from "lucide-react";
 
 export function ModelSelector() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,6 +13,7 @@ export function ModelSelector() {
     provider,
     apiKey,
     groqApiKey,
+    fireworksApiKey,
     selectedModel,
     setSelectedModel,
     models,
@@ -22,7 +23,7 @@ export function ModelSelector() {
 
   const { fetchModels } = useApi();
 
-  const activeKey = provider === "groq" ? groqApiKey : apiKey;
+  const activeKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
 
   useEffect(() => {
     if (isOpen && activeKey && models.length === 0 && !modelsLoading) {
@@ -86,6 +87,10 @@ export function ModelSelector() {
     <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-emerald-500 flex items-center justify-center flex-shrink-0">
       <Zap className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-white" />
     </div>
+  ) : provider === "fireworks" ? (
+    <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-orange-500 flex items-center justify-center flex-shrink-0">
+      <Flame className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-white" />
+    </div>
   ) : (
     <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-primary flex items-center justify-center flex-shrink-0">
       <svg className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -118,11 +123,13 @@ export function ModelSelector() {
             <div className="flex items-center gap-2">
               {provider === "groq" ? (
                 <Zap className="w-3.5 h-3.5 text-emerald-500" />
+              ) : provider === "fireworks" ? (
+                <Flame className="w-3.5 h-3.5 text-orange-500" />
               ) : (
                 <Key className="w-3.5 h-3.5 text-blue-500" />
               )}
-              <span className={`text-xs font-medium ${provider === "groq" ? "text-emerald-500" : "text-blue-500"}`}>
-                {provider === "groq" ? "Groq" : "OpenRouter"} Models
+              <span className={`text-xs font-medium ${provider === "groq" ? "text-emerald-500" : provider === "fireworks" ? "text-orange-500" : "text-blue-500"}`}>
+                {provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks AI" : "OpenRouter"} Models
               </span>
               <span className="text-[10px] text-muted-foreground ml-auto">
                 {models.length} available
