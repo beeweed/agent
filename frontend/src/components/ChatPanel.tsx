@@ -64,6 +64,7 @@ export function ChatPanel() {
     provider,
     apiKey,
     groqApiKey,
+    fireworksApiKey,
     e2bApiKey,
     e2bTemplateId,
     sandboxStatus,
@@ -754,7 +755,7 @@ export function ChatPanel() {
     setCodeStreaming({ isStreaming: false });
   };
 
-  const activeApiKey = provider === "groq" ? groqApiKey : apiKey;
+  const activeApiKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
   const canChat = activeApiKey && e2bApiKey && e2bTemplateId;
 
   return (
@@ -860,7 +861,7 @@ export function ChatPanel() {
               {!activeApiKey && !e2bApiKey 
                 ? "Configure API keys in Settings to start chatting"
                 : !activeApiKey 
-                  ? `${provider === "groq" ? "Groq" : "OpenRouter"} API key required`
+                  ? `${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`
                   : !e2bApiKey
                     ? "E2B API key required for sandbox"
                     : "Create a template to unlock 8GB RAM & 8 CPUs"
