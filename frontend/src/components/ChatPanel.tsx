@@ -61,7 +61,9 @@ export function ChatPanel() {
     maxIterations,
     setIsSettingsOpen,
     setIsMemoryOpen,
+    provider,
     apiKey,
+    groqApiKey,
     e2bApiKey,
     e2bTemplateId,
     sandboxStatus,
@@ -85,8 +87,8 @@ export function ChatPanel() {
   const handleSubmit = async () => {
     if (!input.trim() || isAgentRunning) return;
     
-    // Check for OpenRouter API key
-    if (!apiKey) {
+    // Check for LLM provider API key
+    if (!activeApiKey) {
       setIsSettingsOpen(true);
       return;
     }
@@ -752,7 +754,8 @@ export function ChatPanel() {
     setCodeStreaming({ isStreaming: false });
   };
 
-  const canChat = apiKey && e2bApiKey && e2bTemplateId;
+  const activeApiKey = provider === "groq" ? groqApiKey : apiKey;
+  const canChat = activeApiKey && e2bApiKey && e2bTemplateId;
 
   return (
     <div 
@@ -854,10 +857,10 @@ export function ChatPanel() {
           >
             <Settings className="w-4 h-4 text-orange-500" />
             <span className="text-xs text-orange-500">
-              {!apiKey && !e2bApiKey 
+              {!activeApiKey && !e2bApiKey 
                 ? "Configure API keys in Settings to start chatting"
-                : !apiKey 
-                  ? "OpenRouter API key required"
+                : !activeApiKey 
+                  ? `${provider === "groq" ? "Groq" : "OpenRouter"} API key required`
                   : !e2bApiKey
                     ? "E2B API key required for sandbox"
                     : "Create a template to unlock 8GB RAM & 8 CPUs"

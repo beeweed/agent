@@ -23,7 +23,8 @@ from .models import ContextWindow
 from .system_prompt import get_system_prompt
 from .tool_schemas import TOOL_SCHEMAS
 from .tool_executor import TOOL_EXECUTORS
-from ..services.openrouter import chat_completion
+from ..services.openrouter import chat_completion as openrouter_chat_completion
+from ..services.groq import chat_completion as groq_chat_completion
 from ..services.e2b_sandbox import sandbox_manager
 from ..services.terminal_manager import terminal_manager
 
@@ -166,12 +167,14 @@ class ReActAgent:
         e2b_api_key: str = "",
         session_id: str = "default",
         e2b_template_id: str = "",
+        provider: str = "openrouter",
     ):
         self.api_key = api_key
         self.model = model
         self.max_iterations = max_iterations
         self.e2b_api_key = e2b_api_key
         self.e2b_template_id = e2b_template_id
+        self.provider = provider
         self.context = ContextWindow()
         self.current_iteration = 0
         self.is_running = False
@@ -244,7 +247,9 @@ class ReActAgent:
                 streaming_started: dict[int, bool] = {}
                 thought_stream_started = False
 
-                async for chunk_event in chat_completion(
+                chat_fn = groq_chat_completion if self.provider == "groq" else openrouter_chat_completion
+
+                async for chunk_event in chat_fn(
                     api_key=self.api_key,
                     model=self.model,
                     messages=messages,

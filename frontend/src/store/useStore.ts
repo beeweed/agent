@@ -27,10 +27,17 @@ export interface CodeStreamingState {
 }
 
 export type SandboxStatus = "idle" | "creating" | "ready" | "error";
+export type Provider = "openrouter" | "groq";
 
 interface AppState {
+  provider: Provider;
+  setProvider: (provider: Provider) => void;
+  
   apiKey: string;
   setApiKey: (key: string) => void;
+  
+  groqApiKey: string;
+  setGroqApiKey: (key: string) => void;
   
   e2bApiKey: string;
   setE2bApiKey: (key: string) => void;
@@ -126,8 +133,14 @@ const initialCodeStreamingState: CodeStreamingState = {
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
+      provider: "openrouter",
+      setProvider: (provider) => set({ provider, models: [], selectedModel: "" }),
+      
       apiKey: "",
       setApiKey: (key) => set({ apiKey: key }),
+      
+      groqApiKey: "",
+      setGroqApiKey: (key) => set({ groqApiKey: key }),
       
       e2bApiKey: "",
       setE2bApiKey: (key) => set({ e2bApiKey: key }),
@@ -227,7 +240,9 @@ export const useStore = create<AppState>()(
     {
       name: "anygent-storage",
       partialize: (state) => ({
+        provider: state.provider,
         apiKey: state.apiKey,
+        groqApiKey: state.groqApiKey,
         e2bApiKey: state.e2bApiKey,
         e2bTemplateId: state.e2bTemplateId,
         selectedModel: state.selectedModel,

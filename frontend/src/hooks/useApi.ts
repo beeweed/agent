@@ -3,14 +3,12 @@ import { useStore } from "@/store/useStore";
 import type { AgentEvent, FileNode, Model, Memory } from "@/types";
 
 const getApiBase = () => {
-  // Use env variable if set
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
 
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname.includes("e2b.app")) {
-      // Handle various frontend ports (3000, 5173, etc.) by replacing with 8000
       return window.location.origin.replace(/\d+-/, "8000-");
     }
   }
@@ -20,17 +18,36 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export function useApi() {
-  const { apiKey, e2bApiKey, e2bTemplateId, selectedModel, setModels, setModelsLoading, setFileTree, setMemory } = useStore();
+  const {
+    provider,
+    apiKey,
+    groqApiKey,
+    e2bApiKey,
+    e2bTemplateId,
+    selectedModel,
+    setModels,
+    setModelsLoading,
+    setFileTree,
+    setMemory,
+  } = useStore();
+
+  const getActiveApiKey = useCallback(() => {
+    return provider === "groq" ? groqApiKey : apiKey;
+  }, [provider, apiKey, groqApiKey]);
 
   const fetchModels = useCallback(async () => {
-    if (!apiKey) return;
+    const activeKey = provider === "groq" ? groqApiKey : apiKey;
+    if (!activeKey) return;
     
     setModelsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/models`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey }),
+        body: JSON.stringify({
+          api_key: activeKey,
+          provider: provider,
+        }),
       });
       
       const data = await response.json();
@@ -42,19 +59,22 @@ export function useApi() {
     } finally {
       setModelsLoading(false);
     }
-  }, [apiKey, setModels, setModelsLoading]);
+  }, [provider, apiKey, groqApiKey, setModels, setModelsLoading]);
 
   const sendMessage = useCallback(
     async (message: string, onEvent: (event: AgentEvent) => void) => {
+      const activeKey = provider === "groq" ? groqApiKey : apiKey;
+
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
-          api_key: apiKey,
+          api_key: activeKey,
           model: selectedModel,
           e2b_api_key: e2bApiKey,
           e2b_template_id: e2bTemplateId || undefined,
+          provider: provider,
         }),
       });
 
@@ -88,7 +108,7 @@ export function useApi() {
         }
       }
     },
-    [apiKey, e2bApiKey, e2bTemplateId, selectedModel]
+    [provider, apiKey, groqApiKey, e2bApiKey, e2bTemplateId, selectedModel]
   );
 
   const fetchFileTree = useCallback(async () => {
@@ -119,7 +139,6 @@ export function useApi() {
 
   const readFile = useCallback(async (filePath: string): Promise<string> => {
     try {
-      // Ensure path starts with /home/user/ for E2B sandbox
       let adjustedPath = filePath;
       if (!filePath.startsWith("/home/user/")) {
         adjustedPath = `/home/user${filePath}`;
@@ -210,6 +229,7 @@ export function useApi() {
   }, []);
 
   return {
+    getActiveApiKey,
     fetchModels,
     sendMessage,
     fetchFileTree,

@@ -8,7 +8,8 @@ import asyncio
 import logging
 
 from .agent.react_agent import ReActAgent
-from .services.openrouter import fetch_models
+from .services.openrouter import fetch_models as openrouter_fetch_models
+from .services.groq import fetch_models as groq_fetch_models
 from .services.e2b_sandbox import sandbox_manager
 from .services.terminal_manager import terminal_manager
 
@@ -34,10 +35,12 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     e2b_api_key: Optional[str] = None
     e2b_template_id: Optional[str] = None
+    provider: Optional[str] = "openrouter"
 
 
 class ModelsRequest(BaseModel):
     api_key: str
+    provider: Optional[str] = "openrouter"
 
 
 class FileReadRequest(BaseModel):
@@ -56,8 +59,12 @@ def health_check():
 
 @app.post("/api/models")
 async def get_models(request: ModelsRequest):
-    """Fetch all available models from OpenRouter."""
-    result = await fetch_models(request.api_key)
+    """Fetch all available models from the selected provider."""
+    provider = request.provider or "openrouter"
+    if provider == "groq":
+        result = await groq_fetch_models(request.api_key)
+    else:
+        result = await openrouter_fetch_models(request.api_key)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error"))
     return result
@@ -87,14 +94,17 @@ async def chat(request: ChatRequest):
             }
         )
     
+    provider = request.provider or "openrouter"
+    
     if session_id not in agents:
         agents[session_id] = ReActAgent(
             api_key=request.api_key,
             model=request.model,
             max_iterations=500,
             e2b_api_key=request.e2b_api_key,
-            session_id=session_id,  # Pass session_id for sandbox consistency
-            e2b_template_id=request.e2b_template_id or ""
+            session_id=session_id,
+            e2b_template_id=request.e2b_template_id or "",
+            provider=provider,
         )
     else:
         agents[session_id].api_key = request.api_key
@@ -102,6 +112,7 @@ async def chat(request: ChatRequest):
         agents[session_id].e2b_api_key = request.e2b_api_key
         agents[session_id].session_id = session_id
         agents[session_id].e2b_template_id = request.e2b_template_id or ""
+        agents[session_id].provider = provider
     
     agent = agents[session_id]
     

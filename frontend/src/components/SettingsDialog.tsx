@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
+import type { Provider } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
 import {
   Dialog,
@@ -9,55 +10,108 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Box, Key, Layers, Plus } from "lucide-react";
+import { Box, Key, Layers, Plus, ChevronDown, Zap } from "lucide-react";
 import { SandboxCreatorDialog } from "@/components/SandboxCreatorDialog";
+
+const PROVIDERS: { id: Provider; name: string; icon: React.ReactNode; color: string; description: string; keyPrefix: string; keyUrl: string; keyLabel: string }[] = [
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    icon: <Key className="w-4 h-4" />,
+    color: "text-blue-500",
+    description: "Access Claude, GPT-4o, Gemini, Llama, and more via OpenRouter",
+    keyPrefix: "sk-or-v1-...",
+    keyUrl: "https://openrouter.ai/keys",
+    keyLabel: "OpenRouter API Key",
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    icon: <Zap className="w-4 h-4" />,
+    color: "text-emerald-500",
+    description: "Ultra-fast inference with Groq LPU — Llama, Mixtral, Gemma",
+    keyPrefix: "gsk_...",
+    keyUrl: "https://console.groq.com/keys",
+    keyLabel: "Groq API Key",
+  },
+];
 
 export function SettingsDialog() {
   const {
     isSettingsOpen,
     setIsSettingsOpen,
+    provider,
+    setProvider,
     apiKey,
     setApiKey,
+    groqApiKey,
+    setGroqApiKey,
     e2bApiKey,
     setE2bApiKey,
     e2bTemplateId,
     setE2bTemplateId,
     models,
+    setModels,
   } = useStore();
   
   const { fetchModels } = useApi();
+  const [localProvider, setLocalProvider] = useState<Provider>(provider);
   const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [localGroqApiKey, setLocalGroqApiKey] = useState(groqApiKey);
   const [localE2bApiKey, setLocalE2bApiKey] = useState(e2bApiKey);
   const [localE2bTemplateId, setLocalE2bTemplateId] = useState(e2bTemplateId);
   const [isSandboxCreatorOpen, setIsSandboxCreatorOpen] = useState(false);
+  const [isProviderOpen, setIsProviderOpen] = useState(false);
 
   const handleTemplateCreated = (templateId: string) => {
     setLocalE2bTemplateId(templateId);
   };
 
   useEffect(() => {
+    setLocalProvider(provider);
     setLocalApiKey(apiKey);
+    setLocalGroqApiKey(groqApiKey);
     setLocalE2bApiKey(e2bApiKey);
     setLocalE2bTemplateId(e2bTemplateId);
-  }, [apiKey, e2bApiKey, e2bTemplateId]);
+  }, [provider, apiKey, groqApiKey, e2bApiKey, e2bTemplateId]);
 
   useEffect(() => {
-    if (isSettingsOpen && apiKey && models.length === 0) {
+    if (isSettingsOpen && getActiveApiKey() && models.length === 0) {
       fetchModels();
     }
-  }, [isSettingsOpen, apiKey, models.length, fetchModels]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSettingsOpen]);
+
+  const getActiveApiKey = () => {
+    return localProvider === "groq" ? localGroqApiKey : localApiKey;
+  };
+
+  const selectedProviderConfig = PROVIDERS.find(p => p.id === localProvider) || PROVIDERS[0];
 
   const handleSave = () => {
+    const providerChanged = localProvider !== provider;
+    const apiKeyChanged = localProvider === "openrouter" 
+      ? localApiKey !== apiKey 
+      : localGroqApiKey !== groqApiKey;
+
+    setProvider(localProvider);
     setApiKey(localApiKey);
+    setGroqApiKey(localGroqApiKey);
     setE2bApiKey(localE2bApiKey);
     setE2bTemplateId(localE2bTemplateId);
-    if (localApiKey && localApiKey !== apiKey) {
-      fetchModels();
+
+    if (providerChanged || apiKeyChanged) {
+      setModels([]);
+      setTimeout(() => {
+        fetchModels();
+      }, 100);
     }
+
     setIsSettingsOpen(false);
   };
 
-  const isConfigValid = localApiKey.trim() && localE2bApiKey.trim() && localE2bTemplateId.trim();
+  const activeKey = getActiveApiKey();
+  const isConfigValid = activeKey.trim() && localE2bApiKey.trim() && localE2bTemplateId.trim();
 
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -81,34 +135,135 @@ export function SettingsDialog() {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* OpenRouter API Key Section */}
-          <div data-design-id="api-key-section" className="space-y-3">
+          {/* Provider Selection */}
+          <div data-design-id="provider-section" className="space-y-3">
             <div className="flex items-center gap-2">
-              <Key className="w-4 h-4 text-primary" />
-              <label className="text-sm font-medium text-foreground">OpenRouter API Key</label>
-            </div>
-            <div className="bg-muted rounded-xl p-4 border border-border">
-              <Input
-                data-design-id="api-key-input"
-                type="password"
-                placeholder="sk-or-v1-..."
-                value={localApiKey}
-                onChange={(e) => setLocalApiKey(e.target.value)}
-                className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
-              />
-            </div>
-            <a
-              href="https://openrouter.ai/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              Get your API key
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-            </a>
+              <label className="text-sm font-medium text-foreground">LLM Provider</label>
+            </div>
+            <div className="relative">
+              <button
+                data-design-id="provider-dropdown-trigger"
+                onClick={() => setIsProviderOpen(!isProviderOpen)}
+                className="w-full flex items-center justify-between bg-muted rounded-xl p-4 border border-border hover:border-primary/50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${localProvider === 'groq' ? 'bg-emerald-500/15' : 'bg-blue-500/15'}`}>
+                    <span className={selectedProviderConfig.color}>
+                      {selectedProviderConfig.icon}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-foreground">{selectedProviderConfig.name}</div>
+                    <div className="text-[11px] text-muted-foreground">{selectedProviderConfig.description}</div>
+                  </div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isProviderOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isProviderOpen && (
+                <div
+                  data-design-id="provider-dropdown-menu"
+                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                >
+                  {PROVIDERS.map((p) => (
+                    <button
+                      key={p.id}
+                      data-design-id={`provider-option-${p.id}`}
+                      onClick={() => {
+                        setLocalProvider(p.id);
+                        setIsProviderOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left ${
+                        localProvider === p.id ? 'bg-primary/10' : ''
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg ${p.id === 'groq' ? 'bg-emerald-500/15' : 'bg-blue-500/15'}`}>
+                        <span className={p.color}>{p.icon}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-foreground">{p.name}</div>
+                        <div className="text-[11px] text-muted-foreground">{p.description}</div>
+                      </div>
+                      {localProvider === p.id && (
+                        <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* OpenRouter API Key Section - shown when openrouter is selected */}
+          {localProvider === "openrouter" && (
+            <div data-design-id="api-key-section" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-blue-500" />
+                <label className="text-sm font-medium text-foreground">OpenRouter API Key</label>
+              </div>
+              <div className="bg-muted rounded-xl p-4 border border-border">
+                <Input
+                  data-design-id="api-key-input"
+                  type="password"
+                  placeholder="sk-or-v1-..."
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.target.value)}
+                  className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+                />
+              </div>
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
+              >
+                Get your API key
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          )}
+
+          {/* Groq API Key Section - shown when groq is selected */}
+          {localProvider === "groq" && (
+            <div data-design-id="groq-api-key-section" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-emerald-500" />
+                <label className="text-sm font-medium text-foreground">Groq API Key</label>
+              </div>
+              <div className="bg-muted rounded-xl p-4 border border-border">
+                <Input
+                  data-design-id="groq-api-key-input"
+                  type="password"
+                  placeholder="gsk_..."
+                  value={localGroqApiKey}
+                  onChange={(e) => setLocalGroqApiKey(e.target.value)}
+                  className="bg-transparent border-none text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Zap className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-500/60" />
+                <span>Groq provides ultra-fast inference powered by custom LPU hardware. Supports tool/function calling.</span>
+              </div>
+              <a
+                href="https://console.groq.com/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:underline"
+              >
+                Get your Groq API key
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          )}
 
           {/* E2B API Key Section */}
           <div data-design-id="e2b-api-key-section" className="space-y-3">
@@ -219,6 +374,18 @@ export function SettingsDialog() {
               </svg>
               <p className="text-xs text-purple-400">
                 <span className="font-semibold">Template required!</span> Create a template to chat with AI and get 8GB RAM + 8 CPU cores for your sandbox.
+              </p>
+            </div>
+          )}
+
+          {/* Warning if LLM API key is missing */}
+          {!activeKey.trim() && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-xs text-amber-500">
+                {selectedProviderConfig.name} API key is required to use the agent.
               </p>
             </div>
           )}

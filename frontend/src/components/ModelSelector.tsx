@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { useApi } from "@/hooks/useApi";
-import { ChevronDown, Search, Check, Loader2 } from "lucide-react";
+import { ChevronDown, Search, Check, Loader2, Zap, Key } from "lucide-react";
 
 export function ModelSelector() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,7 +10,9 @@ export function ModelSelector() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
+    provider,
     apiKey,
+    groqApiKey,
     selectedModel,
     setSelectedModel,
     models,
@@ -20,11 +22,13 @@ export function ModelSelector() {
 
   const { fetchModels } = useApi();
 
+  const activeKey = provider === "groq" ? groqApiKey : apiKey;
+
   useEffect(() => {
-    if (isOpen && apiKey && models.length === 0 && !modelsLoading) {
+    if (isOpen && activeKey && models.length === 0 && !modelsLoading) {
       fetchModels();
     }
-  }, [isOpen, apiKey, models.length, modelsLoading, fetchModels]);
+  }, [isOpen, activeKey, models.length, modelsLoading, fetchModels]);
 
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
@@ -50,7 +54,7 @@ export function ModelSelector() {
   }, [isOpen]);
 
   const handleToggle = () => {
-    if (!apiKey) {
+    if (!activeKey) {
       setIsSettingsOpen(true);
       return;
     }
@@ -73,9 +77,22 @@ export function ModelSelector() {
     if (model) {
       return model.name;
     }
+    if (!selectedModel) return "Select Model";
     const modelParts = selectedModel.split("/");
     return modelParts[modelParts.length - 1] || "Select Model";
   };
+
+  const providerBadge = provider === "groq" ? (
+    <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-emerald-500 flex items-center justify-center flex-shrink-0">
+      <Zap className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-white" />
+    </div>
+  ) : (
+    <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-primary flex items-center justify-center flex-shrink-0">
+      <svg className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    </div>
+  );
 
   return (
     <div data-design-id="model-selector-container" className="relative" ref={dropdownRef}>
@@ -84,11 +101,7 @@ export function ModelSelector() {
         onClick={handleToggle}
         className="flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1 xs:py-1.5 rounded-md border border-border bg-muted hover:bg-accent active:bg-accent hover:border-primary/50 transition-all text-[11px] xs:text-[13px]"
       >
-        <div className="w-4 h-4 xs:w-[18px] xs:h-[18px] rounded bg-primary flex items-center justify-center flex-shrink-0">
-          <svg className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
+        {providerBadge}
         <span className="text-foreground hidden xs:inline truncate max-w-[80px] sm:max-w-[120px]">
           {getModelDisplayName()}
         </span>
@@ -100,6 +113,23 @@ export function ModelSelector() {
           data-design-id="model-selector-dropdown"
           className="absolute bottom-full left-0 mb-2 w-[280px] xs:w-[320px] sm:w-[360px] bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
+          {/* Provider indicator header */}
+          <div className="px-3 py-2 border-b border-border bg-muted/50">
+            <div className="flex items-center gap-2">
+              {provider === "groq" ? (
+                <Zap className="w-3.5 h-3.5 text-emerald-500" />
+              ) : (
+                <Key className="w-3.5 h-3.5 text-blue-500" />
+              )}
+              <span className={`text-xs font-medium ${provider === "groq" ? "text-emerald-500" : "text-blue-500"}`}>
+                {provider === "groq" ? "Groq" : "OpenRouter"} Models
+              </span>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {models.length} available
+              </span>
+            </div>
+          </div>
+
           <div className="p-2 border-b border-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -121,7 +151,7 @@ export function ModelSelector() {
                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
                 <span className="text-sm text-muted-foreground">Loading models...</span>
               </div>
-            ) : !apiKey ? (
+            ) : !activeKey ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground mb-3">API key required</p>
                 <button
@@ -153,7 +183,12 @@ export function ModelSelector() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-foreground truncate">{model.name}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">{model.id}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground truncate">{model.id}</span>
+                        {model.context_length > 0 && (
+                          <span className="text-[10px] text-muted-foreground/60">{Math.round(model.context_length / 1024)}K ctx</span>
+                        )}
+                      </div>
                     </div>
                     {selectedModel === model.id && (
                       <Check className="w-4 h-4 text-primary flex-shrink-0 ml-2" />
