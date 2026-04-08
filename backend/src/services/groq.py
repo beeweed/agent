@@ -16,7 +16,7 @@ GROQ_API_URL = "https://api.groq.com/openai/v1"
 
 
 async def fetch_models(api_key: str) -> dict:
-    """Fetch all available models from Groq."""
+    """Fetch all available models from Groq — no filtering, returns everything."""
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -34,17 +34,21 @@ async def fetch_models(api_key: str) -> dict:
 
                 formatted = []
                 for m in models:
-                    if not m.get("active", True):
-                        continue
                     model_id = m.get("id", "")
-                    if "whisper" in model_id or "prompt-guard" in model_id or "safeguard" in model_id or "orpheus" in model_id:
-                        continue
+                    owned_by = m.get("owned_by", "unknown")
+                    context_window = m.get("context_window", 0)
+                    active = m.get("active", True)
+
+                    desc_parts = [f"Groq - {owned_by}"]
+                    if not active:
+                        desc_parts.append("(inactive)")
+
                     formatted.append(
                         {
                             "id": model_id,
                             "name": model_id,
-                            "context_length": m.get("context_window", 0),
-                            "description": f"Groq - {m.get('owned_by', 'unknown')}",
+                            "context_length": context_window,
+                            "description": " ".join(desc_parts),
                         }
                     )
                 formatted.sort(key=lambda x: x.get("name", "").lower())

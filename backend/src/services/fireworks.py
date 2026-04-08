@@ -18,72 +18,99 @@ FIREWORKS_MODELS_API_URL = "https://api.fireworks.ai/v1"
 
 
 async def fetch_models(api_key: str) -> dict:
-    """Fetch available models from Fireworks AI.
+    """Fetch ALL models from Fireworks AI — no filtering, no limits.
 
-    Uses the Fireworks REST API to list serverless models that are publicly
-    available (account ``fireworks``).  The response is paginated so we
-    iterate through all pages.
+    Paginates through every page from the ``accounts/fireworks/models``
+    endpoint (public/serverless catalogue) as well as the caller's own
+    account models, returning the full combined list.
     """
     try:
         all_models: list[dict] = []
-        page_token: str | None = None
+        seen_names: set[str] = set()
 
         async with httpx.AsyncClient() as client:
-            while True:
-                params: dict = {"pageSize": 200}
-                if page_token:
-                    params["pageToken"] = page_token
+            # Fetch from the public "fireworks" account (serverless catalogue)
+            # AND attempt to fetch the caller's own account models.
+            accounts = ["fireworks"]
 
-                response = await client.get(
-                    f"{FIREWORKS_MODELS_API_URL}/accounts/fireworks/models",
+            # Try to detect the caller's account id via a small probe request
+            try:
+                probe = await client.get(
+                    f"{FIREWORKS_MODELS_API_URL}/accounts",
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
                     },
-                    params=params,
-                    timeout=30.0,
+                    timeout=15.0,
                 )
+                if probe.status_code == 200:
+                    probe_data = probe.json()
+                    for acct in probe_data.get("accounts", []):
+                        acct_name = acct.get("name", "")
+                        acct_id = acct_name.replace("accounts/", "") if acct_name.startswith("accounts/") else acct_name
+                        if acct_id and acct_id != "fireworks":
+                            accounts.append(acct_id)
+            except Exception:
+                pass  # Non-critical — proceed with "fireworks" only
 
-                if response.status_code != 200:
-                    return {
-                        "success": False,
-                        "error": f"Failed to fetch models: {response.status_code} – {response.text[:300]}",
-                    }
+            for account_id in accounts:
+                page_token: str | None = None
+                while True:
+                    params: dict = {"pageSize": 200}
+                    if page_token:
+                        params["pageToken"] = page_token
 
-                data = response.json()
-                models_page = data.get("models", [])
-                all_models.extend(models_page)
+                    response = await client.get(
+                        f"{FIREWORKS_MODELS_API_URL}/accounts/{account_id}/models",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        params=params,
+                        timeout=30.0,
+                    )
 
-                page_token = data.get("nextPageToken")
-                if not page_token:
-                    break
+                    if response.status_code != 200:
+                        # Skip this account on error and continue with others
+                        break
+
+                    data = response.json()
+                    models_page = data.get("models", [])
+
+                    for m in models_page:
+                        name_field = m.get("name", "")
+                        if name_field not in seen_names:
+                            seen_names.add(name_field)
+                            all_models.append(m)
+
+                    page_token = data.get("nextPageToken")
+                    if not page_token:
+                        break
 
         formatted = []
         for m in all_models:
             name_field = m.get("name", "")
             display_name = m.get("displayName", name_field)
 
-            if not m.get("supportsServerless", False):
-                continue
-
-            state = m.get("state", "")
-            if state not in ("DEPLOYED", "READY", ""):
-                continue
-
             model_id = name_field
-            if model_id.startswith("accounts/fireworks/models/"):
-                model_id = model_id
-            elif "/" not in model_id:
-                model_id = f"accounts/fireworks/models/{model_id}"
+            if not model_id.startswith("accounts/"):
+                if "/" not in model_id:
+                    model_id = f"accounts/fireworks/models/{model_id}"
 
             context_length = m.get("contextLength", 0)
             supports_tools = m.get("supportsTools", False)
+            supports_serverless = m.get("supportsServerless", False)
+            state = m.get("state", "")
 
             desc_parts = []
             if supports_tools:
-                desc_parts.append("🔧 Tools")
+                desc_parts.append("Tools")
             if m.get("supportsImageInput", False):
-                desc_parts.append("🖼 Vision")
+                desc_parts.append("Vision")
+            if supports_serverless:
+                desc_parts.append("Serverless")
+            if state and state not in ("DEPLOYED", "READY"):
+                desc_parts.append(state.capitalize())
             param_count = (m.get("baseModelDetails") or {}).get("parameterCount", "")
             if param_count:
                 desc_parts.append(f"{param_count} params")
