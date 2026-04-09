@@ -43,10 +43,9 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
   const handleCloseTab = useCallback(
     (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
-      if (tabs.length <= 1) return;
       removeTab(id);
     },
-    [tabs.length, removeTab]
+    [removeTab]
   );
 
   const toggleMaximize = useCallback(() => {
@@ -291,13 +290,26 @@ export function MultiTerminal({ className = "" }: MultiTerminalProps) {
         </div>
 
         {/* Terminal instances */}
-        {tabs.map((tab) => (
-          <TerminalInstance
-            key={tab.id}
-            terminalId={tab.id}
-            isVisible={tab.id === activeTabId}
-          />
-        ))}
+        {tabs.length === 0 ? (
+          <div
+            data-design-id="terminal-empty-state"
+            className="flex flex-col items-center justify-center h-full text-[#565f89] gap-2"
+          >
+            <TerminalSquare className="w-6 h-6 text-[#3b4261]" />
+            <span className="text-[11px]">No terminal sessions</span>
+            <span className="text-[10px] text-[#3b4261]">
+              A terminal will open when the agent runs a command
+            </span>
+          </div>
+        ) : (
+          tabs.map((tab) => (
+            <TerminalInstance
+              key={tab.id}
+              terminalId={tab.id}
+              isVisible={tab.id === activeTabId}
+            />
+          ))
+        )}
       </div>
     </div>
   );

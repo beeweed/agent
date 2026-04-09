@@ -348,18 +348,14 @@ export function TerminalInstance({ terminalId, isVisible }: TerminalInstanceProp
     };
   }, [sendInput, sendBinary, sendResize, debouncedFit]);
 
-  // Auto-connect when sandbox is ready
+  // Connect when this terminal instance mounts (terminals are only created on demand)
+  // and handle sandbox status changes for cleanup
   useEffect(() => {
     if (sandboxStatus === "ready") {
-      // Only connect if not already connected
       if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-        const timer = setTimeout(() => {
-          connectWs();
-        }, 500);
-        return () => clearTimeout(timer);
+        connectWs();
       }
     } else if (sandboxStatus === "idle" || sandboxStatus === "error") {
-      // Only tear down on idle (no sandbox) or error — NOT during "creating"
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -368,7 +364,6 @@ export function TerminalInstance({ terminalId, isVisible }: TerminalInstanceProp
       setTabConnected(terminalId, false);
       setTabPid(terminalId, null);
     }
-    // When sandboxStatus === "creating", leave the existing connection untouched
   }, [sandboxStatus, connectWs, setTabConnected, setTabPid, clearPingInterval, terminalId]);
 
   // Cleanup on unmount

@@ -24,17 +24,10 @@ interface TerminalStoreState {
   getTabIdForSession: (sessionName: string) => string | null;
 }
 
-const INITIAL_TAB: TerminalTab = {
-  id: "term_0",
-  name: "Terminal 1",
-  connected: false,
-  pid: null,
-};
-
 export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
-  tabs: [INITIAL_TAB],
-  activeTabId: INITIAL_TAB.id,
-  nextIndex: 1,
+  tabs: [],
+  activeTabId: "",
+  nextIndex: 0,
   sessionNameToTabId: {},
 
   addTab: () => {
@@ -56,10 +49,15 @@ export const useTerminalStore = create<TerminalStoreState>((set, get) => ({
 
   removeTab: (id: string) => {
     const { tabs, activeTabId } = get();
-    if (tabs.length <= 1) return;
+    if (tabs.length === 0) return;
 
     const idx = tabs.findIndex((t) => t.id === id);
     const filtered = tabs.filter((t) => t.id !== id);
+
+    if (filtered.length === 0) {
+      set({ tabs: [], activeTabId: "" });
+      return;
+    }
 
     let newActive = activeTabId;
     if (activeTabId === id) {
