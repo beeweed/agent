@@ -27,7 +27,6 @@ from ..services.openrouter import chat_completion as openrouter_chat_completion
 from ..services.groq import chat_completion as groq_chat_completion
 from ..services.fireworks import chat_completion as fireworks_chat_completion
 from ..services.e2b_sandbox import sandbox_manager
-from ..services.terminal_manager import terminal_manager
 
 
 class StreamingToolParser:
@@ -358,62 +357,8 @@ class ReActAgent:
                         for evt in self._emit_tool_start_events(tool_name, tool_id, arguments):
                             yield evt
 
-                        # --- Shell tool: coordinate terminal session ---
-                        if tool_name == "shell":
-                            session_name = arguments.get("session_name", "default")
-                            need_new = not terminal_manager.is_session_name_known(session_name)
-
-                            if need_new:
-                                yield {
-                                    "type": "terminal_session_request",
-                                    "session_name": session_name,
-                                    "iteration": self.current_iteration,
-                                }
-
-                                tab_id = None
-                                for _ in range(300):
-                                    tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
-                                    if tab_id is not None:
-                                        break
-                                    await asyncio.sleep(0.1)
-
-                                if tab_id is None:
-                                    result = await self._fallback_execute(arguments)
-                                else:
-                                    terminal_key = f"{self.session_id}__term__{tab_id}"
-                                    terminal_manager.create_ready_event(terminal_key)
-                                    existing = terminal_manager.sessions.get(terminal_key)
-                                    if existing and existing.is_active:
-                                        terminal_manager.signal_ready(terminal_key)
-                                        result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
-                                    else:
-                                        ready = await terminal_manager.wait_for_ready(terminal_key, timeout=30)
-                                        if not ready:
-                                            result = await self._fallback_execute(arguments)
-                                        else:
-                                            result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
-                            else:
-                                tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
-                                terminal_key = f"{self.session_id}__term__{tab_id}"
-                                yield {
-                                    "type": "terminal_session_switch",
-                                    "session_name": session_name,
-                                    "tab_id": tab_id,
-                                    "iteration": self.current_iteration,
-                                }
-                                session = terminal_manager.sessions.get(terminal_key)
-                                if session and session.is_active:
-                                    result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
-                                else:
-                                    terminal_manager.create_ready_event(terminal_key)
-                                    ready = await terminal_manager.wait_for_ready(terminal_key, timeout=15)
-                                    if ready:
-                                        result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
-                                    else:
-                                        result = await self._fallback_execute(arguments)
-
-                        # --- Execute tool (non-shell) ---
-                        elif tool_name in TOOL_EXECUTORS:
+                        # --- Execute tool ---
+                        if tool_name in TOOL_EXECUTORS:
                             result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                         else:
                             result = {"success": False, "error": f"Unknown tool: {tool_name}"}
@@ -479,18 +424,7 @@ class ReActAgent:
         """Yield start events so frontend can show appropriate UI cards."""
         it = self.current_iteration
 
-        if tool_name == "shell":
-            yield {
-                "type": "shell_exec_start",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "command": arguments.get("command", ""),
-                "session_name": arguments.get("session_name", "default"),
-                "description": arguments.get("description", ""),
-                "wait_for_output": arguments.get("wait_for_output", True),
-                "iteration": it,
-            }
-        elif tool_name == "file_read":
+        if tool_name == "file_read":
             yield {
                 "type": "read_file_start",
                 "tool_id": tool_id,
@@ -536,31 +470,12 @@ class ReActAgent:
                 "target_str": arguments.get("target_str", ""),
                 "iteration": it,
             }
-        elif tool_name == "BashView":
-            yield {
-                "type": "bash_view_start",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "session_name": arguments.get("session_name", ""),
-                "iteration": it,
-            }
 
     def _emit_tool_end_events(self, tool_name: str, tool_id: str, arguments: dict, result: dict):
         """Yield end events so frontend can update UI cards with results."""
         it = self.current_iteration
 
-        if tool_name == "shell":
-            yield {
-                "type": "shell_exec_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "command": arguments.get("command", ""),
-                "session_name": arguments.get("session_name", "default"),
-                "description": arguments.get("description", ""),
-                "result": result,
-                "iteration": it,
-            }
-        elif tool_name == "file_read":
+        if tool_name == "file_read":
             yield {
                 "type": "read_file_end",
                 "tool_id": tool_id,
@@ -611,31 +526,6 @@ class ReActAgent:
                 "result": result,
                 "iteration": it,
             }
-        elif tool_name == "BashView":
-            yield {
-                "type": "bash_view_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "session_name": arguments.get("session_name", ""),
-                "result": result,
-                "iteration": it,
-            }
-
-    # ------------------------------------------------------------------
-    # Fallback execution via sandbox commands API (no PTY needed)
-    # ------------------------------------------------------------------
-
-    async def _fallback_execute(self, arguments: dict) -> dict:
-        """Execute shell command directly via sandbox commands API when PTY is unavailable."""
-        command = arguments.get("command", "")
-        wait_for_output = arguments.get("wait_for_output", True)
-        if not command:
-            return {"success": False, "output": "No command provided"}
-        return await sandbox_manager.execute_command(
-            self.session_id,
-            command,
-            wait_for_output=wait_for_output,
-        )
 
     # ------------------------------------------------------------------
     # Control

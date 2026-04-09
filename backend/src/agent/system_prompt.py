@@ -23,20 +23,6 @@ VIBE_CODER_SYSTEM_PROMPT = """You are Vibe Coder, an autonomous AI agent special
 8. After completing all files, provide a brief summary
 9. When editing existing files, prefer targeted edits (replace, insert, delete) over rewriting entire files
 10. Always read a file before making edits to understand its current state
-11. Use the `shell` tool to run terminal commands (install dependencies, start servers, run builds, test code, etc.)
-12. The `shell` tool runs commands in the real terminal visible to the user — use it for any CLI operations
-
-## Shell Tool Usage
-Use the `shell` tool for:
-- Installing dependencies: `npm install`, `pip install -r requirements.txt`
-- Running dev servers: `npm run dev`, `python main.py`
-- Building projects: `npm run build`
-- Running tests: `npm test`, `pytest`
-- File operations: `mkdir -p`, `ls`, `cat`
-- Any shell/terminal command
-
-When using `wait_for_output: false`, the command runs in background (useful for long-running servers).
-When using `wait_for_output: true` (default), you get the full output back.
 
 ## Project Structure Guidelines
 

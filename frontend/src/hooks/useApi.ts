@@ -219,18 +219,6 @@ export function useApi() {
     }
   }, [e2bApiKey]);
 
-  const registerTerminalSession = useCallback(async (sessionName: string, tabId: string) => {
-    try {
-      await fetch(`${API_BASE}/api/terminal/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_name: sessionName, tab_id: tabId }),
-      });
-    } catch (error) {
-      console.error("Failed to register terminal session:", error);
-    }
-  }, []);
-
   return {
     getActiveApiKey,
     fetchModels,
@@ -243,6 +231,5 @@ export function useApi() {
     stopAgent,
     getSandboxStatus,
     sandboxKeepalive,
-    registerTerminalSession,
   };
 }

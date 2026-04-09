@@ -105,12 +105,6 @@ interface AppState {
   resetCodeStreaming: () => void;
   appendStreamingCode: (content: string) => void;
   
-  terminalConnected: boolean;
-  setTerminalConnected: (connected: boolean) => void;
-  
-  terminalHeight: number;
-  setTerminalHeight: (height: number) => void;
-  
   }
 
 const initialCodeStreamingState: CodeStreamingState = {
@@ -235,12 +229,6 @@ export const useStore = create<AppState>()(
             content: state.codeStreaming.content + content,
           },
         })),
-      
-      terminalConnected: false,
-      setTerminalConnected: (connected) => set({ terminalConnected: connected }),
-      
-      terminalHeight: 220,
-      setTerminalHeight: (height) => set({ terminalHeight: height }),
       
       }),
     {

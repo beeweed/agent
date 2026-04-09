@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional
 import json
 import asyncio
 import logging
@@ -12,7 +12,6 @@ from .services.openrouter import fetch_models as openrouter_fetch_models
 from .services.groq import fetch_models as groq_fetch_models
 from .services.fireworks import fetch_models as fireworks_fetch_models
 from .services.e2b_sandbox import sandbox_manager
-from .services.terminal_manager import terminal_manager
 
 logger = logging.getLogger(__name__)
 
@@ -242,87 +241,6 @@ async def sandbox_keepalive(request: SandboxRequest):
         request.e2b_api_key
     )
     return result
-
-
-@app.websocket("/ws/terminal/{session_id}")
-async def terminal_websocket(websocket: WebSocket, session_id: str = "default"):
-    """
-    WebSocket endpoint for interactive PTY terminal (legacy single-terminal).
-    
-    Protocol:
-      Client -> Server (JSON):
-        { "type": "input", "data": "<base64-encoded-bytes>" }
-        { "type": "resize", "cols": 80, "rows": 24 }
-      
-      Server -> Client (JSON):
-        { "type": "output", "data": "<base64-encoded-bytes>" }
-        { "type": "error", "message": "..." }
-        { "type": "exit", "exit_code": 0 }
-        { "type": "connected", "pid": 123 }
-    """
-    await websocket.accept()
-    
-    try:
-        await terminal_manager.handle_websocket(websocket, session_id, sandbox_manager)
-    except WebSocketDisconnect:
-        logger.info(f"Terminal WebSocket disconnected for session {session_id}")
-    except Exception as e:
-        logger.error(f"Terminal WebSocket error for session {session_id}: {e}")
-        try:
-            await websocket.send_json({"type": "error", "message": str(e)})
-        except Exception:
-            pass
-    finally:
-        await terminal_manager.cleanup_session(session_id)
-
-
-@app.websocket("/ws/terminal/{session_id}/{terminal_id}")
-async def terminal_websocket_multi(websocket: WebSocket, session_id: str, terminal_id: str):
-    """
-    WebSocket endpoint for multi-terminal support.
-    
-    Each terminal tab connects with a unique terminal_id.
-    All terminals within the same session_id share the same E2B sandbox
-    but get independent PTY processes.
-    
-    The composite key `{session_id}__term__{terminal_id}` is used internally
-    to manage separate TerminalSession instances while the sandbox is looked up
-    by the original session_id.
-    """
-    await websocket.accept()
-    
-    terminal_session_key = f"{session_id}__term__{terminal_id}"
-    
-    try:
-        await terminal_manager.handle_websocket(
-            websocket, terminal_session_key, sandbox_manager,
-            sandbox_session_id=session_id
-        )
-    except WebSocketDisconnect:
-        logger.info(f"Terminal WebSocket disconnected for {terminal_session_key}")
-    except Exception as e:
-        logger.error(f"Terminal WebSocket error for {terminal_session_key}: {e}")
-        try:
-            await websocket.send_json({"type": "error", "message": str(e)})
-        except Exception:
-            pass
-    finally:
-        await terminal_manager.cleanup_session(terminal_session_key)
-
-
-@app.post("/api/terminal/register")
-async def register_terminal_session(request: dict):
-    """
-    Register a mapping from LLM session_name to a frontend terminal tab_id.
-    Called by the frontend when it creates/reuses a terminal tab for the agent.
-    """
-    session_name = request.get("session_name", "")
-    tab_id = request.get("tab_id", "")
-    if not session_name or not tab_id:
-        raise HTTPException(status_code=400, detail="session_name and tab_id are required")
-    
-    terminal_manager.register_session_name(session_name, tab_id)
-    return {"success": True, "session_name": session_name, "tab_id": tab_id}
 
 
 @app.get("/api/status")

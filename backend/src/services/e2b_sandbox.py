@@ -27,7 +27,7 @@ class E2BSandboxManager:
     - Reconnects to existing sandboxes when possible
     - Stores sandbox IDs for reconnection after server restart
     - Extends sandbox timeout on activity
-    - PTY terminal support for interactive shell access
+    - File operations and command execution
     """
     
     def __init__(self):
@@ -514,15 +514,12 @@ class E2BSandboxManager:
         timeout: int = 120,
     ) -> dict:
         """
-        Execute a shell command in the sandbox using the E2B commands API.
+        Execute a command in the sandbox using the E2B commands API.
         This runs the command and captures stdout/stderr.
-        
-        For terminal visibility, the terminal_manager will inject the command
-        into the PTY separately.
         
         Args:
             session_id: Session identifier
-            command: Shell command to execute
+            command: Command to execute
             wait_for_output: Whether to wait for completion
             timeout: Command timeout in seconds
             

@@ -96,21 +96,6 @@ export interface DeleteStrFromFileResult {
   error?: string;
 }
 
-export interface ShellResult {
-  success: boolean;
-  output: string;
-  exit_code?: number;
-  error?: string;
-}
-
-export interface BashViewResult {
-  success?: boolean;
-  session_name: string;
-  status?: "running" | "completed";
-  output?: string;
-  error?: string;
-}
-
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -141,22 +126,15 @@ export interface AgentEvent {
     | "delete_lines_start"
     | "delete_lines_end"
     | "delete_str_from_file_start"
-    | "delete_str_from_file_end"
-    | "shell_exec_start"
-    | "shell_exec_end"
-    | "terminal_session_request"
-    | "terminal_session_switch"
-    | "bash_view_start"
-    | "bash_view_end";
+    | "delete_str_from_file_end";
   content?: string;
-  tab_id?: string;
   error?: string;
   iteration?: number;
   max_iterations?: number;
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult | ShellResult | BashViewResult;
+  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -167,10 +145,6 @@ export interface AgentEvent {
   new_str?: string;  // For insert_line tool
   target_line?: number | string;  // For delete_lines_from_file tool
   target_str?: string;  // For delete_str_from_file tool
-  command?: string;  // For shell tool
-  session_name?: string;  // For shell tool
-  description?: string;  // For shell tool
-  wait_for_output?: boolean;  // For shell tool
 }
 
 export interface Model {
@@ -206,7 +180,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card" | "shell_card" | "bash_view_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
@@ -219,7 +193,6 @@ export interface ChatEntry {
   insertResult?: InsertLineResult;
   deleteResult?: DeleteLinesResult;
   deleteStrResult?: DeleteStrFromFileResult;
-  shellResult?: ShellResult;
   timestamp: Date;
   isStreaming?: boolean;
   sandboxStatus?: "creating" | "ready" | "error";
@@ -230,11 +203,4 @@ export interface ChatEntry {
   targetLine?: number | string;  // For delete_lines_from_file tool
   deletedLines?: string;  // For delete_lines_from_file tool
   targetStr?: string;  // For delete_str_from_file tool
-  shellCommand?: string;  // For shell tool
-  shellSessionName?: string;  // For shell tool
-  shellDescription?: string;  // For shell tool
-  shellStatus?: "running" | "completed" | "error";  // For shell tool
-  bashViewSessionName?: string;  // For BashView tool
-  bashViewStatus?: "viewing" | "viewed" | "error";  // For BashView tool
-  bashViewResult?: BashViewResult;  // For BashView tool
 }

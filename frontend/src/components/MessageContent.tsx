@@ -335,7 +335,7 @@ function Heading({ level, children }: { level: number; children: React.ReactNode
     6: "text-sm font-medium mt-2 mb-1 text-muted-foreground",
   };
 
-  const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+  const Tag = `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
   return <Tag className={classes[level as keyof typeof classes]}>{children}</Tag>;
 }
 

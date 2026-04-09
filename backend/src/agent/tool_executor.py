@@ -11,7 +11,6 @@ after the API returns a structured tool_call object.
 from typing import Dict, Optional, Callable, Awaitable
 
 from ..services.e2b_sandbox import sandbox_manager
-from ..services.terminal_manager import terminal_manager
 
 
 # ---------------------------------------------------------------------------
@@ -207,57 +206,6 @@ async def execute_delete_str(session_id: str, arguments: dict) -> dict:
     }
 
 
-async def execute_bash_view(session_id: str, arguments: dict) -> dict:
-    """
-    Return the current output buffer for a named terminal session.
-    Strictly read-only — never executes commands.
-    Returns immediately with whatever output is currently in the buffer.
-    """
-    session_name = arguments.get("session_name", "")
-    if not session_name:
-        return {"error": "No session_name provided", "session_name": ""}
-
-    return terminal_manager.view_session_output(session_name)
-
-
-async def execute_shell(session_id: str, arguments: dict) -> dict:
-    """
-    Execute a shell command exclusively through the PTY terminal.
-
-    The command is typed into the real terminal (visible in the Computer Panel).
-    Output is captured by monitoring PTY data until the shell prompt ('$')
-    re-appears, meaning the command has finished. No separate process is spawned.
-
-    Uses the LLM-provided session_name to route to the correct terminal tab.
-    The composite terminal key is: {session_id}__term__{tab_id}
-    """
-    command = arguments.get("command", "")
-    session_name = arguments.get("session_name", "default")
-    wait_for_output = arguments.get("wait_for_output", True)
-
-    if not command:
-        return {"success": False, "output": "No command provided"}
-
-    tab_id = terminal_manager.get_tab_id_for_session_name(session_name)
-    if tab_id is None:
-        return {
-            "success": False,
-            "output": f"Terminal session '{session_name}' not ready. Waiting for frontend to create it.",
-            "error": "Terminal not ready",
-        }
-
-    terminal_key = f"{session_id}__term__{tab_id}"
-
-    result = await terminal_manager.execute_in_terminal(
-        terminal_key,
-        command,
-        sandbox_manager,
-        wait_for_output=wait_for_output,
-    )
-
-    return result
-
-
 # ---------------------------------------------------------------------------
 # Tool registry — maps tool name → executor function
 # ---------------------------------------------------------------------------
@@ -269,6 +217,4 @@ TOOL_EXECUTORS: Dict[str, Callable[..., Awaitable[dict]]] = {
     "insert_line": execute_insert_line,
     "delete_lines": execute_delete_lines,
     "delete_str": execute_delete_str,
-    "shell": execute_shell,
-    "BashView": execute_bash_view,
 }

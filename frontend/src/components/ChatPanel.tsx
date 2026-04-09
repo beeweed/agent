@@ -1,11 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { useTerminalStore } from "@/store/useTerminalStore";
 import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult, ShellResult, BashViewResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -66,14 +65,13 @@ export function ChatPanel() {
     groqApiKey,
     fireworksApiKey,
     e2bApiKey,
-    e2bTemplateId,
     sandboxStatus,
     setSandboxStatus,
     setCodeStreaming,
     resetCodeStreaming,
   } = useStore();
   
-  const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent, registerTerminalSession } = useApi();
+  const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent } = useApi();
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -121,8 +119,6 @@ export function ChatPanel() {
     let currentInsertLineCardId: string | null = null;
     let currentDeleteLinesCardId: string | null = null;
     let currentDeleteStrCardId: string | null = null;
-    let currentShellCardId: string | null = null;
-    let currentBashViewCardId: string | null = null;
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -549,106 +545,6 @@ export function ChatPanel() {
             }
             break;
 
-          case "bash_view_start":
-            {
-              const sessionName = event.session_name || "";
-              console.log("[BASH_VIEW_START]", sessionName);
-
-              const bashViewEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "bash_view_card",
-                bashViewSessionName: sessionName,
-                bashViewStatus: "viewing",
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentBashViewCardId = bashViewEntry.id;
-              addChatEntry(bashViewEntry);
-            }
-            break;
-
-          case "bash_view_end":
-            {
-              const result = event.result as BashViewResult;
-              console.log("[BASH_VIEW_END]", result?.session_name, result?.status);
-
-              if (currentBashViewCardId) {
-                updateChatEntry(currentBashViewCardId, {
-                  bashViewStatus: result?.error ? "error" : "viewed",
-                  bashViewResult: result,
-                });
-                currentBashViewCardId = null;
-              }
-            }
-            break;
-
-          case "terminal_session_request":
-            {
-              const sessionName = event.session_name || "default";
-              console.log("[TERMINAL_SESSION_REQUEST] Creating terminal for session:", sessionName);
-              const termStore = useTerminalStore.getState();
-              const { tabId } = termStore.findOrCreateTabForSession(sessionName);
-              registerTerminalSession(sessionName, tabId);
-            }
-            break;
-
-          case "terminal_session_switch":
-            {
-              const sessionName = event.session_name || "default";
-              const tabId = event.tab_id || "";
-              console.log("[TERMINAL_SESSION_SWITCH] Switching to session:", sessionName, "tab:", tabId);
-              if (tabId) {
-                useTerminalStore.getState().setActiveTab(tabId);
-              }
-            }
-            break;
-
-          case "shell_exec_start":
-            {
-              const command = event.command || "";
-              const sessionName = event.session_name || "default";
-              const description = event.description || "Running command";
-              console.log("[SHELL_EXEC_START]", command, "session:", sessionName);
-
-              const termStore = useTerminalStore.getState();
-              const existingTab = termStore.getTabIdForSession(sessionName);
-              if (existingTab) {
-                termStore.setActiveTab(existingTab);
-              }
-
-              const shellEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "shell_card",
-                shellCommand: command,
-                shellSessionName: sessionName,
-                shellDescription: description,
-                shellStatus: "running",
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentShellCardId = shellEntry.id;
-              addChatEntry(shellEntry);
-            }
-            break;
-
-          case "shell_exec_end":
-            {
-              const result = event.result as ShellResult;
-              console.log("[SHELL_EXEC_END]", result?.success);
-
-              if (currentShellCardId) {
-                updateChatEntry(currentShellCardId, {
-                  shellStatus: result?.success ? "completed" : "error",
-                  shellResult: result,
-                });
-                currentShellCardId = null;
-              }
-
-              // Refresh file tree in case the command modified files
-              fetchFileTree();
-            }
-            break;
-            
           case "tool_error":
             if (currentFileCardId) {
               updateChatEntry(currentFileCardId, { fileStatus: "error" });
@@ -673,14 +569,6 @@ export function ChatPanel() {
             if (currentDeleteStrCardId) {
               updateChatEntry(currentDeleteStrCardId, { fileStatus: "error" });
               currentDeleteStrCardId = null;
-            }
-            if (currentShellCardId) {
-              updateChatEntry(currentShellCardId, { shellStatus: "error" });
-              currentShellCardId = null;
-            }
-            if (currentBashViewCardId) {
-              updateChatEntry(currentBashViewCardId, { bashViewStatus: "error" });
-              currentBashViewCardId = null;
             }
             setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
             break;

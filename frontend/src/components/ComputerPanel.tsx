@@ -1,7 +1,6 @@
-import { useEffect, useRef, useMemo, useCallback } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { Monitor, Code, Play, SkipBack, SkipForward, BookOpen, Replace, Plus, Trash2, Eraser } from "lucide-react";
-import { MultiTerminal } from "@/components/MultiTerminal";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 
@@ -173,69 +172,8 @@ function DeleteStrView({ filePath, targetStr }: { filePath: string; targetStr: s
 }
 
 export function ComputerPanel() {
-  const { codeStreaming, isAgentRunning, sandboxStatus, terminalHeight, setTerminalHeight } = useStore();
+  const { codeStreaming, isAgentRunning } = useStore();
   const codeContainerRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startY = useRef(0);
-  const startHeight = useRef(0);
-
-  const showTerminal = sandboxStatus === "ready" || sandboxStatus === "creating";
-
-  const prevHeightRef = useRef(terminalHeight);
-  const lastClickRef = useRef(0);
-
-  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-
-    // Double-click detection → toggle between min and expanded
-    const now = Date.now();
-    if (now - lastClickRef.current < 300) {
-      const containerH = containerRef.current?.clientHeight || 600;
-      if (terminalHeight < 200) {
-        setTerminalHeight(Math.min(prevHeightRef.current || 300, containerH - 120));
-      } else {
-        prevHeightRef.current = terminalHeight;
-        setTerminalHeight(80);
-      }
-      lastClickRef.current = 0;
-      return;
-    }
-    lastClickRef.current = now;
-
-    isDragging.current = true;
-    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-    startY.current = clientY;
-    startHeight.current = terminalHeight;
-
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      if (!isDragging.current) return;
-      const currentY = "touches" in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY;
-      const delta = startY.current - currentY;
-      const containerH = containerRef.current?.clientHeight || 600;
-      const minH = 80;
-      const maxH = containerH - 120;
-      const newH = Math.max(minH, Math.min(maxH, startHeight.current + delta));
-      setTerminalHeight(newH);
-    };
-
-    const onUp = () => {
-      isDragging.current = false;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.removeEventListener("touchmove", onMove);
-      document.removeEventListener("touchend", onUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onUp);
-  }, [terminalHeight, setTerminalHeight]);
 
   useEffect(() => {
     if (codeContainerRef.current) {
@@ -315,7 +253,7 @@ export function ComputerPanel() {
   };
 
   return (
-    <div ref={containerRef} data-design-id="computer-panel" className="flex flex-col h-full w-full overflow-hidden">
+    <div data-design-id="computer-panel" className="flex flex-col h-full w-full overflow-hidden">
       <div data-design-id="computer-header" className="p-2 xs:p-3 sm:p-4 border-b border-border flex-shrink-0">
         <div className="flex justify-between items-center mb-1.5 xs:mb-2 sm:mb-3">
           <h2 data-design-id="computer-title" className="font-medium text-foreground text-xs xs:text-sm sm:text-base">
@@ -394,8 +332,7 @@ export function ComputerPanel() {
 
       <div data-design-id="computer-content" className="flex-1 p-1.5 xs:p-2 sm:p-3.5 overflow-hidden flex flex-col min-h-0">
         {/* Code editor area */}
-        <div className={`flex flex-col rounded-md xs:rounded-lg sm:rounded-xl bg-secondary border border-border shadow-sm overflow-hidden ${showTerminal ? '' : 'flex-1'}`}
-          style={showTerminal ? { flex: '1 1 0', minHeight: '120px' } : undefined}
+        <div className="flex flex-col rounded-md xs:rounded-lg sm:rounded-xl bg-secondary border border-border shadow-sm overflow-hidden flex-1"
         >
           <div data-design-id="computer-file-header" className="flex justify-center items-center min-h-7 xs:min-h-8 sm:min-h-9 border-b border-border bg-card/50 flex-shrink-0">
             <span className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground truncate px-2">
@@ -514,43 +451,7 @@ export function ComputerPanel() {
           </div>
         </div>
 
-        {/* Resizable Terminal Panel */}
-        {showTerminal && (
-          <>
-            {/* Drag handle — supports mouse & touch, double-click to toggle */}
-            <div
-              data-design-id="terminal-resize-handle"
-              onMouseDown={handleDragStart}
-              onTouchStart={handleDragStart}
-              className="flex-shrink-0 flex items-center justify-center h-3 cursor-row-resize group mt-0.5 touch-none"
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize terminal"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setTerminalHeight(Math.min((containerRef.current?.clientHeight || 600) - 120, terminalHeight + 20));
-                } else if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setTerminalHeight(Math.max(80, terminalHeight - 20));
-                }
-              }}
-            >
-              <div className="w-12 h-1 rounded-full bg-[#292e42] group-hover:bg-[#7aa2f7]/60 group-active:bg-[#7aa2f7] transition-colors" />
-            </div>
-
-            {/* Terminal */}
-            <div
-              data-design-id="terminal-container"
-              className="flex-shrink-0 rounded-md xs:rounded-lg sm:rounded-xl overflow-hidden border border-[#292e42] mt-0.5"
-              style={{ height: `${terminalHeight}px` }}
-            >
-              <MultiTerminal className="h-full" />
-            </div>
-          </>
-        )}
-      </div>
+        </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createTemplate, startBuild, makeTemplatePublic, getBuildStatus } from "@/lib/e2b-template-api";
-import { Terminal, Cpu, MemoryStick, Clock, Globe, Copy, Check, Loader2 } from "lucide-react";
+import { Box, Cpu, MemoryStick, Clock, Globe, Copy, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Step = "idle" | "creating" | "building" | "making-public" | "polling" | "done" | "error";
@@ -131,7 +131,7 @@ export function SandboxCreatorDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-purple-500/15">
-              <Terminal className="w-5 h-5 text-purple-500" />
+              <Box className="w-5 h-5 text-purple-500" />
             </div>
             <div>
               <DialogTitle data-design-id="sandbox-creator-title" className="text-foreground">
