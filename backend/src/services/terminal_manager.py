@@ -148,10 +148,16 @@ class TerminalManager:
         return self._session_name_to_tab.get(session_name)
 
     def create_ready_event(self, terminal_key: str) -> asyncio.Event:
-        """Create (or reset) a readiness event for a terminal key."""
+        """Create a readiness event for a terminal key if one does not exist yet."""
+        existing = self._ready_events.get(terminal_key)
+        if existing:
+            return existing
         event = asyncio.Event()
+        session = self.sessions.get(terminal_key)
+        if session and session.is_active:
+            event.set()
         self._ready_events[terminal_key] = event
-        logger.info(f"Created ready event for terminal key '{terminal_key}'")
+        logger.info(f"Created ready event for terminal key '{terminal_key}' (pre-set={event.is_set()})")
         return event
 
     def signal_ready(self, terminal_key: str):
@@ -160,21 +166,32 @@ class TerminalManager:
         if event:
             event.set()
             logger.info(f"Terminal ready signal set for '{terminal_key}'")
+        else:
+            pre_event = asyncio.Event()
+            pre_event.set()
+            self._ready_events[terminal_key] = pre_event
+            logger.info(f"Terminal ready signal pre-set for '{terminal_key}' (event created on signal)")
 
     async def wait_for_ready(self, terminal_key: str, timeout: int = TERMINAL_READY_TIMEOUT_SEC) -> bool:
         """Wait until the terminal session is ready (PTY connected)."""
+        session = self.sessions.get(terminal_key)
+        if session and session.is_active:
+            return True
+
         event = self._ready_events.get(terminal_key)
         if event is None:
             event = self.create_ready_event(terminal_key)
 
-        session = self.sessions.get(terminal_key)
-        if session and session.is_active:
+        if event.is_set():
             return True
 
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout)
             return True
         except asyncio.TimeoutError:
+            session = self.sessions.get(terminal_key)
+            if session and session.is_active:
+                return True
             logger.warning(f"Timed out waiting for terminal '{terminal_key}' to be ready")
             return False
 
@@ -383,22 +400,24 @@ class TerminalManager:
         session = self.sessions.get(session_id)
         if not session or not session.is_active or not session.pid:
             logger.info(f"Terminal '{session_id}' not active yet, waiting for ready signal...")
-            ready = await self.wait_for_ready(session_id)
+            ready = await self.wait_for_ready(session_id, timeout=15)
             if not ready:
-                logger.warning(f"Terminal '{session_id}' never became ready")
-                return {
-                    "success": False,
-                    "output": "Terminal session timed out waiting to initialize.",
-                    "error": "Terminal not ready",
-                }
+                logger.warning(f"Terminal '{session_id}' never became ready, falling back to sandbox commands API")
+                sandbox_base = session_id.split("__term__")[0] if "__term__" in session_id else session_id
+                return await sandbox_manager.execute_command(
+                    sandbox_base,
+                    command,
+                    wait_for_output=wait_for_output,
+                )
             session = self.sessions.get(session_id)
             if not session or not session.is_active or not session.pid:
-                logger.warning(f"Terminal '{session_id}' still not active after ready signal")
-                return {
-                    "success": False,
-                    "output": "No active terminal session after initialization.",
-                    "error": "No active terminal session",
-                }
+                logger.warning(f"Terminal '{session_id}' still not active after ready signal, falling back")
+                sandbox_base = session_id.split("__term__")[0] if "__term__" in session_id else session_id
+                return await sandbox_manager.execute_command(
+                    sandbox_base,
+                    command,
+                    wait_for_output=wait_for_output,
+                )
 
         sandbox_base = session_id.split("__term__")[0] if "__term__" in session_id else session_id
         try:

@@ -130,7 +130,7 @@ export function SettingsDialog() {
   };
 
   const activeKey = getActiveApiKey();
-  const isConfigValid = activeKey.trim() && localE2bApiKey.trim() && localE2bTemplateId.trim();
+  const isConfigValid = activeKey.trim() && localE2bApiKey.trim();
 
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -361,7 +361,7 @@ export function SettingsDialog() {
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-purple-500" />
                 <label className="text-sm font-medium text-foreground">E2B Sandbox Template</label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Required</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-medium">Optional</span>
               </div>
               <Button
                 data-design-id="create-template-button"
@@ -404,7 +404,7 @@ export function SettingsDialog() {
               <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>A template is required to chat with the AI. Create one using the button above.</span>
+              <span>A custom template is optional. The base template will be used if none is specified. Create one for 8GB RAM + 8 CPUs.</span>
             </div>
           </div>
 
@@ -420,14 +420,14 @@ export function SettingsDialog() {
             </div>
           )}
           
-          {/* Warning if Template is missing */}
+          {/* Info if Template is not set */}
           {localE2bApiKey.trim() && !localE2bTemplateId.trim() && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-              <svg className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-purple-400">
-                <span className="font-semibold">Template required!</span> Create a template to chat with AI and get 8GB RAM + 8 CPU cores for your sandbox.
+              <p className="text-xs text-blue-400">
+                Using default base template. Create a custom template for 8GB RAM + 8 CPU cores.
               </p>
             </div>
           )}

@@ -547,7 +547,7 @@ class E2BSandboxManager:
                 )
                 return {
                     "success": True,
-                    "output": "command runned but no output",
+                    "output": "Command started in background (no output captured).",
                 }
 
             # Run command and capture output
@@ -570,7 +570,7 @@ class E2BSandboxManager:
                 output += stderr
 
             if not output.strip():
-                output = "command runned but no output"
+                output = "Command executed successfully (no output)."
 
             return {
                 "success": result.exit_code == 0,

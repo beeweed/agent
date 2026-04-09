@@ -100,11 +100,7 @@ export function ChatPanel() {
       return;
     }
     
-    // Check for E2B Template ID
-    if (!e2bTemplateId) {
-      setIsSettingsOpen(true);
-      return;
-    }
+    // E2B Template ID is optional — base template is used if not set
 
     const userEntry: ChatEntry = {
       id: crypto.randomUUID(),
@@ -756,7 +752,7 @@ export function ChatPanel() {
   };
 
   const activeApiKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
-  const canChat = activeApiKey && e2bApiKey && e2bTemplateId;
+  const canChat = activeApiKey && e2bApiKey;
 
   return (
     <div 
@@ -862,9 +858,7 @@ export function ChatPanel() {
                 ? "Configure API keys in Settings to start chatting"
                 : !activeApiKey 
                   ? `${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`
-                  : !e2bApiKey
-                    ? "E2B API key required for sandbox"
-                    : "Create a template to unlock 8GB RAM & 8 CPUs"
+                  : "E2B API key required for sandbox"
               }
             </span>
           </div>

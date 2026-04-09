@@ -378,25 +378,18 @@ class ReActAgent:
                                     await asyncio.sleep(0.1)
 
                                 if tab_id is None:
-                                    result = {
-                                        "success": False,
-                                        "output": f"Frontend did not create terminal for session '{session_name}'.",
-                                        "error": "Terminal creation timed out",
-                                    }
+                                    result = await self._fallback_execute(arguments)
                                 else:
                                     terminal_key = f"{self.session_id}__term__{tab_id}"
+                                    terminal_manager.create_ready_event(terminal_key)
                                     existing = terminal_manager.sessions.get(terminal_key)
                                     if existing and existing.is_active:
+                                        terminal_manager.signal_ready(terminal_key)
                                         result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                                     else:
-                                        terminal_manager.create_ready_event(terminal_key)
-                                        ready = await terminal_manager.wait_for_ready(terminal_key)
+                                        ready = await terminal_manager.wait_for_ready(terminal_key, timeout=30)
                                         if not ready:
-                                            result = {
-                                                "success": False,
-                                                "output": f"Terminal '{session_name}' timed out during initialization.",
-                                                "error": "Terminal init timeout",
-                                            }
+                                            result = await self._fallback_execute(arguments)
                                         else:
                                             result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                             else:
@@ -412,15 +405,12 @@ class ReActAgent:
                                 if session and session.is_active:
                                     result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                                 else:
-                                    ready = await terminal_manager.wait_for_ready(terminal_key)
+                                    terminal_manager.create_ready_event(terminal_key)
+                                    ready = await terminal_manager.wait_for_ready(terminal_key, timeout=15)
                                     if ready:
                                         result = await TOOL_EXECUTORS[tool_name](self.session_id, arguments)
                                     else:
-                                        result = {
-                                            "success": False,
-                                            "output": f"Terminal '{session_name}' not active.",
-                                            "error": "Terminal not active",
-                                        }
+                                        result = await self._fallback_execute(arguments)
 
                         # --- Execute tool (non-shell) ---
                         elif tool_name in TOOL_EXECUTORS:
@@ -630,6 +620,22 @@ class ReActAgent:
                 "result": result,
                 "iteration": it,
             }
+
+    # ------------------------------------------------------------------
+    # Fallback execution via sandbox commands API (no PTY needed)
+    # ------------------------------------------------------------------
+
+    async def _fallback_execute(self, arguments: dict) -> dict:
+        """Execute shell command directly via sandbox commands API when PTY is unavailable."""
+        command = arguments.get("command", "")
+        wait_for_output = arguments.get("wait_for_output", True)
+        if not command:
+            return {"success": False, "output": "No command provided"}
+        return await sandbox_manager.execute_command(
+            self.session_id,
+            command,
+            wait_for_output=wait_for_output,
+        )
 
     # ------------------------------------------------------------------
     # Control
