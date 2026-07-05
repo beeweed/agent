@@ -218,9 +218,6 @@ The ReAct agent uses native function calling (no prompt-based parsing) with thes
 | `file_write` | Create or overwrite a file |
 | `file_read` | Read file contents with line numbers |
 | `replace_in_file` | Targeted string replacement |
-| `insert_line` | Insert content after a specific line |
-| `delete_lines` | Delete lines by number or range |
-| `delete_str` | Delete exact string occurrence |
 | `shell` | Execute shell commands in a persistent terminal |
 
 ## License

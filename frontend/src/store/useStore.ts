@@ -12,18 +12,6 @@ export interface CodeStreamingState {
   isDiffView: boolean;
   oldString: string;
   newString: string;
-  // Insert view state for insert_line tool
-  isInsertView: boolean;
-  insertLine: number;
-  newStr: string;
-  // Delete view state for delete_lines_from_file tool
-  isDeleteView: boolean;
-  deletedLines: string;
-  startLine: number;
-  endLine: number;
-  // Delete str view state for delete_str_from_file tool
-  isDeleteStrView: boolean;
-  targetStr: string;
 }
 
 export type Provider = "openrouter" | "groq" | "fireworks";
@@ -112,15 +100,6 @@ const initialCodeStreamingState: CodeStreamingState = {
   isDiffView: false,
   oldString: "",
   newString: "",
-  isInsertView: false,
-  insertLine: 0,
-  newStr: "",
-  isDeleteView: false,
-  deletedLines: "",
-  startLine: 0,
-  endLine: 0,
-  isDeleteStrView: false,
-  targetStr: "",
 };
 
 export const useStore = create<AppState>()(

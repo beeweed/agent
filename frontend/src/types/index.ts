@@ -67,35 +67,6 @@ export interface ReplaceInFileResult {
   error?: string;
 }
 
-export interface InsertLineResult {
-  success: boolean;
-  message?: string;
-  file_path?: string;
-  insert_line?: number;
-  new_str?: string;
-  lines_inserted?: number;
-  error?: string;
-}
-
-export interface DeleteLinesResult {
-  success: boolean;
-  message?: string;
-  file_path?: string;
-  deleted_lines?: string;
-  start_line?: number;
-  end_line?: number;
-  lines_deleted?: number;
-  error?: string;
-}
-
-export interface DeleteStrFromFileResult {
-  success: boolean;
-  message?: string;
-  file_path?: string;
-  target_str?: string;
-  error?: string;
-}
-
 export interface AgentEvent {
   type: 
     | "iteration_start"
@@ -117,13 +88,7 @@ export interface AgentEvent {
     | "read_file_start"
     | "read_file_end"
     | "replace_in_file_start"
-    | "replace_in_file_end"
-    | "insert_line_start"
-    | "insert_line_end"
-    | "delete_lines_start"
-    | "delete_lines_end"
-    | "delete_str_from_file_start"
-    | "delete_str_from_file_end";
+    | "replace_in_file_end";
   content?: string;
   error?: string;
   iteration?: number;
@@ -131,17 +96,13 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ReplaceInFileResult | InsertLineResult | DeleteLinesResult | DeleteStrFromFileResult;
+  result?: ToolResult | ReadFileResult | ReplaceInFileResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
   file_path?: string;
   old_string?: string;
   new_string?: string;
-  insert_line?: number;
-  new_str?: string;
-  target_line?: number | string;
-  target_str?: string;
 }
 
 export interface Model {
@@ -177,26 +138,18 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "replace_in_file_card";
   content?: string;
   filePath?: string;
-  fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
+  fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced";
   iteration?: number;
   toolName?: string;
   arguments?: Record<string, unknown>;
   result?: ToolResult;
   readResult?: ReadFileResult;
   replaceResult?: ReplaceInFileResult;
-  insertResult?: InsertLineResult;
-  deleteResult?: DeleteLinesResult;
-  deleteStrResult?: DeleteStrFromFileResult;
   timestamp: Date;
   isStreaming?: boolean;
   oldString?: string;
   newString?: string;
-  insertLine?: number;
-  newStr?: string;
-  targetLine?: number | string;
-  deletedLines?: string;
-  targetStr?: string;
 }

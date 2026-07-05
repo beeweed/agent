@@ -404,34 +404,7 @@ class ReActAgent:
                 "new_string": arguments.get("new_string", ""),
                 "iteration": it,
             }
-        elif tool_name == "insert_line":
-            yield {
-                "type": "insert_line_start",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "insert_line": arguments.get("insert_line", 0),
-                "new_str": arguments.get("new_str", ""),
-                "iteration": it,
-            }
-        elif tool_name == "delete_lines":
-            yield {
-                "type": "delete_lines_start",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "target_line": arguments.get("target_line", 0),
-                "iteration": it,
-            }
-        elif tool_name == "delete_str":
-            yield {
-                "type": "delete_str_from_file_start",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "target_str": arguments.get("target_str", ""),
-                "iteration": it,
-            }
+
 
     def _emit_tool_end_events(self, tool_name: str, tool_id: str, arguments: dict, result: dict):
         """Yield end events so frontend can update UI cards with results."""
@@ -457,37 +430,7 @@ class ReActAgent:
                 "result": result,
                 "iteration": it,
             }
-        elif tool_name == "insert_line":
-            yield {
-                "type": "insert_line_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "insert_line": arguments.get("insert_line", 0),
-                "new_str": arguments.get("new_str", ""),
-                "result": result,
-                "iteration": it,
-            }
-        elif tool_name == "delete_lines":
-            yield {
-                "type": "delete_lines_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "target_line": arguments.get("target_line", 0),
-                "result": result,
-                "iteration": it,
-            }
-        elif tool_name == "delete_str":
-            yield {
-                "type": "delete_str_from_file_end",
-                "tool_id": tool_id,
-                "tool_name": tool_name,
-                "file_path": arguments.get("file_path", ""),
-                "target_str": arguments.get("target_str", ""),
-                "result": result,
-                "iteration": it,
-            }
+
 
     # ------------------------------------------------------------------
     # Control

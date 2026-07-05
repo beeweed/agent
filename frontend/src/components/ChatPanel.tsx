@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, InsertLineResult, DeleteLinesResult, DeleteStrFromFileResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult } from "@/types";
 import { 
   Send,
   Settings,
@@ -74,9 +74,7 @@ export function ChatPanel() {
     let currentThoughtId: string | null = null;
     let currentReadFileCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
-    let currentInsertLineCardId: string | null = null;
-    let currentDeleteLinesCardId: string | null = null;
-    let currentDeleteStrCardId: string | null = null;
+
 
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
@@ -316,213 +314,7 @@ export function ChatPanel() {
               fetchFileTree();
             }
             break;
-          
-          case "insert_line_start":
-            {
-              const filePath = event.file_path || "";
-              const insertLine = event.insert_line || 0;
-              const newStr = event.new_str || "";
-              console.log("[INSERT_LINE_START]", filePath, "at line", insertLine);
-              
-              // Show insert view in computer panel
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Insert",
-                action: `Inserting into ${filePath}`,
-                isInsertView: true,
-                insertLine,
-                newStr,
-              });
-              
-              // Create insert line card entry
-              const insertEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "insert_line_card",
-                filePath,
-                fileStatus: "inserting",
-                insertLine,
-                newStr,
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentInsertLineCardId = insertEntry.id;
-              addChatEntry(insertEntry);
-            }
-            break;
-          
-          case "insert_line_end":
-            {
-              const result = event.result as InsertLineResult;
-              console.log("[INSERT_LINE_END]", event.file_path, result?.success);
-              
-              // Update the insert line card with result
-              if (currentInsertLineCardId) {
-                updateChatEntry(currentInsertLineCardId, {
-                  fileStatus: result?.success ? "inserted" : "error",
-                  insertResult: result,
-                });
-                currentInsertLineCardId = null;
-              }
-              
-              // Update local file storage with new content
-              if (result?.success) {
-                const r = result as unknown as Record<string, unknown>;
-                if (r.file_path && r.new_content) {
-                  updateLocalFile(r.file_path as string, r.new_content as string);
-                }
-              }
-              
-              // Keep showing the insert view but mark streaming as complete
-              setCodeStreaming({ 
-                isStreaming: false,
-              });
-              
-              // Refresh file tree after insertion
-              fetchFileTree();
-            }
-            break;
-          
-          case "delete_lines_start":
-            {
-              const filePath = event.file_path || "";
-              const targetLine = event.target_line;
-              console.log("[DELETE_LINES_START]", filePath, "target_line:", targetLine);
-              
-              // Show delete view in computer panel
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Delete",
-                action: `Deleting from ${filePath}`,
-                isDeleteView: true,
-                deletedLines: "",
-                startLine: 0,
-                endLine: 0,
-              });
-              
-              // Create delete lines card entry
-              const deleteEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "delete_lines_card",
-                filePath,
-                fileStatus: "deleting",
-                targetLine,
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentDeleteLinesCardId = deleteEntry.id;
-              addChatEntry(deleteEntry);
-            }
-            break;
-          
-          case "delete_lines_end":
-            {
-              const result = event.result as DeleteLinesResult;
-              console.log("[DELETE_LINES_END]", event.file_path, result?.success);
-              
-              // Update the delete lines card with result
-              if (currentDeleteLinesCardId) {
-                updateChatEntry(currentDeleteLinesCardId, {
-                  fileStatus: result?.success ? "deleted" : "error",
-                  deleteResult: result,
-                  deletedLines: result?.deleted_lines || "",
-                });
-                currentDeleteLinesCardId = null;
-              }
-              
-              // Update local file storage with new content
-              if (result?.success) {
-                const r = result as unknown as Record<string, unknown>;
-                if (r.file_path && r.new_content) {
-                  updateLocalFile(r.file_path as string, r.new_content as string);
-                }
-              }
-              
-              // Show deleted lines in computer panel
-              if (result?.success && result?.deleted_lines) {
-                setCodeStreaming({
-                  isStreaming: false,
-                  deletedLines: result.deleted_lines,
-                  startLine: result.start_line || 0,
-                  endLine: result.end_line || 0,
-                });
-              } else {
-                setCodeStreaming({ 
-                  isStreaming: false,
-                });
-              }
-              
-              // Refresh file tree after deletion
-              fetchFileTree();
-            }
-            break;
-          
-          case "delete_str_from_file_start":
-            {
-              const filePath = event.file_path || "";
-              const targetStr = event.target_str || "";
-              console.log("[DELETE_STR_FROM_FILE_START]", filePath);
-              
-              // Show delete str view in computer panel
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Delete",
-                action: `Deleting from ${filePath}`,
-                isDeleteStrView: true,
-                targetStr,
-              });
-              
-              // Create delete str card entry
-              const deleteStrEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "delete_str_from_file_card",
-                filePath,
-                fileStatus: "deleting_str",
-                targetStr,
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentDeleteStrCardId = deleteStrEntry.id;
-              addChatEntry(deleteStrEntry);
-            }
-            break;
-          
-          case "delete_str_from_file_end":
-            {
-              const result = event.result as DeleteStrFromFileResult;
-              console.log("[DELETE_STR_FROM_FILE_END]", event.file_path, result?.success);
-              
-              // Update the delete str card with result
-              if (currentDeleteStrCardId) {
-                updateChatEntry(currentDeleteStrCardId, {
-                  fileStatus: result?.success ? "deleted_str" : "error",
-                  deleteStrResult: result,
-                });
-                currentDeleteStrCardId = null;
-              }
-              
-              // Update local file storage with new content
-              if (result?.success) {
-                const r = result as unknown as Record<string, unknown>;
-                if (r.file_path && r.new_content) {
-                  updateLocalFile(r.file_path as string, r.new_content as string);
-                }
-              }
-              
-              // Keep showing the delete str view but mark streaming as complete
-              setCodeStreaming({ 
-                isStreaming: false,
-              });
-              
-              // Refresh file tree after deletion
-              fetchFileTree();
-            }
-            break;
+
 
           case "tool_error":
             if (currentFileCardId) {
@@ -537,25 +329,13 @@ export function ChatPanel() {
               updateChatEntry(currentReplaceInFileCardId, { fileStatus: "error" });
               currentReplaceInFileCardId = null;
             }
-            if (currentInsertLineCardId) {
-              updateChatEntry(currentInsertLineCardId, { fileStatus: "error" });
-              currentInsertLineCardId = null;
-            }
-            if (currentDeleteLinesCardId) {
-              updateChatEntry(currentDeleteLinesCardId, { fileStatus: "error" });
-              currentDeleteLinesCardId = null;
-            }
-            if (currentDeleteStrCardId) {
-              updateChatEntry(currentDeleteStrCardId, { fileStatus: "error" });
-              currentDeleteStrCardId = null;
-            }
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "complete":
             fetchMemory();
             fetchFileTree();  // Refresh file tree after completion
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "max_iterations_reached":
@@ -565,7 +345,7 @@ export function ChatPanel() {
               content: `Maximum iterations (${event.max_iterations}) reached. The agent has stopped.`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "error":
@@ -575,12 +355,12 @@ export function ChatPanel() {
               content: `Error: ${event.error}`,
               timestamp: new Date(),
             });
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
             
           case "stream_end":
             setIsAgentRunning(false);
-            setCodeStreaming({ isStreaming: false, isDiffView: false, isInsertView: false, isDeleteView: false, isDeleteStrView: false });
+            setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
         }
       });
@@ -591,7 +371,7 @@ export function ChatPanel() {
         content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
         timestamp: new Date(),
       });
-      setCodeStreaming({ isStreaming: false, isDeleteView: false, isDeleteStrView: false });
+      setCodeStreaming({ isStreaming: false });
     } finally {
       setIsAgentRunning(false);
     }
