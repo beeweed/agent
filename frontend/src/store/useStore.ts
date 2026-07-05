@@ -26,7 +26,6 @@ export interface CodeStreamingState {
   targetStr: string;
 }
 
-export type SandboxStatus = "idle" | "creating" | "ready" | "error";
 export type Provider = "openrouter" | "groq" | "fireworks";
 
 interface AppState {
@@ -41,15 +40,6 @@ interface AppState {
   
   fireworksApiKey: string;
   setFireworksApiKey: (key: string) => void;
-  
-  e2bApiKey: string;
-  setE2bApiKey: (key: string) => void;
-  
-  e2bTemplateId: string;
-  setE2bTemplateId: (id: string) => void;
-  
-  sandboxStatus: SandboxStatus;
-  setSandboxStatus: (status: SandboxStatus) => void;
   
   selectedModel: string;
   setSelectedModel: (model: string) => void;
@@ -66,6 +56,12 @@ interface AppState {
   
   fileTree: FileNode | null;
   setFileTree: (tree: FileNode | null) => void;
+  
+  localFiles: Record<string, string>;
+  setLocalFiles: (files: Record<string, string>) => void;
+  updateLocalFile: (path: string, content: string) => void;
+  removeLocalFile: (path: string) => void;
+  clearLocalFiles: () => void;
   
   selectedFile: string | null;
   setSelectedFile: (path: string | null) => void;
@@ -142,15 +138,6 @@ export const useStore = create<AppState>()(
       fireworksApiKey: "",
       setFireworksApiKey: (key) => set({ fireworksApiKey: key }),
       
-      e2bApiKey: "",
-      setE2bApiKey: (key) => set({ e2bApiKey: key }),
-      
-      e2bTemplateId: "",
-      setE2bTemplateId: (id) => set({ e2bTemplateId: id }),
-      
-      sandboxStatus: "idle",
-      setSandboxStatus: (status) => set({ sandboxStatus: status }),
-      
       selectedModel: "anthropic/claude-3.5-sonnet",
       setSelectedModel: (model) => set({ selectedModel: model }),
       
@@ -168,10 +155,23 @@ export const useStore = create<AppState>()(
             entry.id === id ? { ...entry, ...updates } : entry
           ),
         })),
-      clearChat: () => set({ chatEntries: [], sandboxStatus: "idle" }),
+      clearChat: () => set({ chatEntries: [] }),
       
       fileTree: null,
       setFileTree: (tree) => set({ fileTree: tree }),
+      
+      localFiles: {},
+      setLocalFiles: (files) => set({ localFiles: files }),
+      updateLocalFile: (path, content) =>
+        set((state) => ({
+          localFiles: { ...state.localFiles, [path]: content },
+        })),
+      removeLocalFile: (path) =>
+        set((state) => {
+          const { [path]: _, ...rest } = state.localFiles;
+          return { localFiles: rest };
+        }),
+      clearLocalFiles: () => set({ localFiles: {} }),
       
       selectedFile: null,
       setSelectedFile: (path) => set({ selectedFile: path }),
@@ -238,8 +238,6 @@ export const useStore = create<AppState>()(
         apiKey: state.apiKey,
         groqApiKey: state.groqApiKey,
         fireworksApiKey: state.fireworksApiKey,
-        e2bApiKey: state.e2bApiKey,
-        e2bTemplateId: state.e2bTemplateId,
         selectedModel: state.selectedModel,
       }),
     }

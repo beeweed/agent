@@ -26,7 +26,6 @@ from .tool_executor import TOOL_EXECUTORS
 from ..services.openrouter import chat_completion as openrouter_chat_completion
 from ..services.groq import chat_completion as groq_chat_completion
 from ..services.fireworks import chat_completion as fireworks_chat_completion
-from ..services.e2b_sandbox import sandbox_manager
 
 
 class StreamingToolParser:
@@ -164,45 +163,17 @@ class ReActAgent:
         api_key: str,
         model: str = "anthropic/claude-3.5-sonnet",
         max_iterations: int = 500,
-        e2b_api_key: str = "",
         session_id: str = "default",
-        e2b_template_id: str = "",
         provider: str = "openrouter",
     ):
         self.api_key = api_key
         self.model = model
         self.max_iterations = max_iterations
-        self.e2b_api_key = e2b_api_key
-        self.e2b_template_id = e2b_template_id
         self.provider = provider
         self.context = ContextWindow()
         self.current_iteration = 0
         self.is_running = False
         self.session_id = session_id
-        self.sandbox_ready = False
-
-    # ------------------------------------------------------------------
-    # Sandbox lifecycle
-    # ------------------------------------------------------------------
-
-    async def ensure_sandbox(self) -> dict:
-        if not self.e2b_api_key:
-            return {"success": False, "error": "E2B API key not configured"}
-
-        status = await sandbox_manager.get_sandbox_status(self.session_id)
-        if status.get("exists") and status.get("is_running"):
-            self.sandbox_ready = True
-            return {"success": True, "message": "Sandbox already running"}
-
-        result = await sandbox_manager.create_sandbox(
-            self.session_id,
-            self.e2b_api_key,
-            timeout=300,
-            template_id=self.e2b_template_id,
-        )
-        if result.get("success"):
-            self.sandbox_ready = True
-        return result
 
     # ------------------------------------------------------------------
     # Message helpers
@@ -218,15 +189,6 @@ class ReActAgent:
     async def run(self, user_message: str, on_event: Optional[Callable] = None) -> AsyncGenerator:
         self.is_running = True
         self.current_iteration = 0
-
-        # --- Sandbox setup ---
-        yield {"type": "sandbox_creating", "message": "Creating sandbox..."}
-        sandbox_result = await self.ensure_sandbox()
-        if not sandbox_result.get("success"):
-            yield {"type": "sandbox_error", "error": sandbox_result.get("error", "Failed to create sandbox")}
-            self.is_running = False
-            return
-        yield {"type": "sandbox_ready", "message": "Sandbox ready"}
 
         self.context.add_user_message(user_message)
         yield {"type": "iteration_start", "iteration": 0, "max_iterations": self.max_iterations}

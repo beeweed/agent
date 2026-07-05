@@ -13,13 +13,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "file_write",
-            "description": "Create or overwrite a file at the given path inside the sandbox. Use for creating new files or fully rewriting existing ones.",
+            "description": "Create or overwrite a file at the given path. Use for creating new files or fully rewriting existing ones.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/. Example: /home/user/project/src/App.tsx"
+                        "description": "Absolute path for the file. Example: /project/src/App.tsx"
                     },
                     "content": {
                         "type": "string",
@@ -34,13 +34,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "file_read",
-            "description": "Read the content of an existing file from the sandbox. Returns content with line numbers.",
+            "description": "Read the content of an existing file. Returns content with line numbers.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/. Example: /home/user/project/src/main.py"
+                        "description": "Absolute path of the file. Example: /project/src/main.py"
                     }
                 },
                 "required": ["file_path"]
@@ -57,7 +57,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/."
+                        "description": "Absolute path of the file."
                     },
                     "old_string": {
                         "type": "string",
@@ -82,7 +82,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/."
+                        "description": "Absolute path of the file."
                     },
                     "insert_line": {
                         "type": "integer",
@@ -107,7 +107,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/."
+                        "description": "Absolute path of the file."
                     },
                     "target_line": {
                         "type": ["integer", "string"],
@@ -128,7 +128,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "Absolute path starting with /home/user/."
+                        "description": "Absolute path of the file."
                     },
                     "target_str": {
                         "type": "string",

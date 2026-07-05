@@ -10,39 +10,7 @@ import {
   Settings,
   RotateCcw,
   Lightbulb,
-  Box
 } from "lucide-react";
-
-function SandboxIndicator({ status }: { status: "creating" | "ready" | "error" }) {
-  if (status === "creating") {
-    return (
-      <div data-design-id="sandbox-indicator" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 animate-pulse">
-        <div className="relative">
-          <Box className="w-5 h-5 text-orange-500" />
-          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-500 animate-ping" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-orange-500">Creating sandbox...</span>
-          <span className="text-xs text-orange-500/70">Setting up secure environment</span>
-        </div>
-      </div>
-    );
-  }
-  
-  if (status === "ready") {
-    return (
-      <div data-design-id="sandbox-ready-indicator" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
-        <Box className="w-5 h-5 text-green-500" />
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-green-500">Sandbox ready</span>
-          <span className="text-xs text-green-500/70">Secure environment active</span>
-        </div>
-      </div>
-    );
-  }
-  
-  return null;
-}
 
 export function ChatPanel() {
   const [input, setInput] = useState("");
@@ -64,11 +32,9 @@ export function ChatPanel() {
     apiKey,
     groqApiKey,
     fireworksApiKey,
-    e2bApiKey,
-    sandboxStatus,
-    setSandboxStatus,
     setCodeStreaming,
     resetCodeStreaming,
+    updateLocalFile,
   } = useStore();
   
   const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent } = useApi();
@@ -81,7 +47,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatEntries, sandboxStatus, scrollToBottom]);
+  }, [chatEntries, scrollToBottom]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isAgentRunning) return;
@@ -91,14 +57,6 @@ export function ChatPanel() {
       setIsSettingsOpen(true);
       return;
     }
-    
-    // Check for E2B API key
-    if (!e2bApiKey) {
-      setIsSettingsOpen(true);
-      return;
-    }
-    
-    // E2B Template ID is optional — base template is used if not set
 
     const userEntry: ChatEntry = {
       id: crypto.randomUUID(),
@@ -123,24 +81,6 @@ export function ChatPanel() {
     try {
       await sendMessage(input.trim(), (event: AgentEvent) => {
         switch (event.type) {
-          case "sandbox_creating":
-            setSandboxStatus("creating");
-            break;
-            
-          case "sandbox_ready":
-            setSandboxStatus("ready");
-            break;
-            
-          case "sandbox_error":
-            setSandboxStatus("error");
-            addChatEntry({
-              id: crypto.randomUUID(),
-              type: "assistant",
-              content: `Sandbox Error: ${event.error}. Please check your E2B API key in Settings.`,
-              timestamp: new Date(),
-            });
-            break;
-            
           case "iteration":
             setCurrentIteration(event.iteration || 0);
             break;
@@ -240,6 +180,13 @@ export function ChatPanel() {
                   fileStatus: event.result?.success ? "created" : "error",
                 });
                 currentFileCardId = null;
+              }
+              // Store file content locally
+              if (event.result?.success) {
+                const r = event.result as unknown as Record<string, unknown>;
+                if (r.file_path && r.content) {
+                  updateLocalFile(r.file_path as string, r.content as string);
+                }
               }
               setCodeStreaming({ isStreaming: false });
               fetchFileTree();
@@ -352,6 +299,14 @@ export function ChatPanel() {
                 currentReplaceInFileCardId = null;
               }
               
+              // Update local file storage with new content
+              if (result?.success) {
+                const r = result as unknown as Record<string, unknown>;
+                if (r.file_path && r.new_content) {
+                  updateLocalFile(r.file_path as string, r.new_content as string);
+                }
+              }
+              
               // Keep showing the diff view but mark streaming as complete
               setCodeStreaming({ 
                 isStreaming: false,
@@ -411,6 +366,14 @@ export function ChatPanel() {
                 currentInsertLineCardId = null;
               }
               
+              // Update local file storage with new content
+              if (result?.success) {
+                const r = result as unknown as Record<string, unknown>;
+                if (r.file_path && r.new_content) {
+                  updateLocalFile(r.file_path as string, r.new_content as string);
+                }
+              }
+              
               // Keep showing the insert view but mark streaming as complete
               setCodeStreaming({ 
                 isStreaming: false,
@@ -427,7 +390,7 @@ export function ChatPanel() {
               const targetLine = event.target_line;
               console.log("[DELETE_LINES_START]", filePath, "target_line:", targetLine);
               
-              // Show delete view in computer panel (will be filled after execution)
+              // Show delete view in computer panel
               setCodeStreaming({
                 filePath,
                 content: "",
@@ -468,6 +431,14 @@ export function ChatPanel() {
                   deletedLines: result?.deleted_lines || "",
                 });
                 currentDeleteLinesCardId = null;
+              }
+              
+              // Update local file storage with new content
+              if (result?.success) {
+                const r = result as unknown as Record<string, unknown>;
+                if (r.file_path && r.new_content) {
+                  updateLocalFile(r.file_path as string, r.new_content as string);
+                }
               }
               
               // Show deleted lines in computer panel
@@ -533,6 +504,14 @@ export function ChatPanel() {
                   deleteStrResult: result,
                 });
                 currentDeleteStrCardId = null;
+              }
+              
+              // Update local file storage with new content
+              if (result?.success) {
+                const r = result as unknown as Record<string, unknown>;
+                if (r.file_path && r.new_content) {
+                  updateLocalFile(r.file_path as string, r.new_content as string);
+                }
               }
               
               // Keep showing the delete str view but mark streaming as complete
@@ -630,7 +609,6 @@ export function ChatPanel() {
     useStore.getState().clearChat();
     setCurrentIteration(0);
     resetCodeStreaming();
-    setSandboxStatus("idle");
   };
 
   const handleStop = async () => {
@@ -640,7 +618,7 @@ export function ChatPanel() {
   };
 
   const activeApiKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
-  const canChat = activeApiKey && e2bApiKey;
+  const canChat = !!activeApiKey;
 
   return (
     <div 
@@ -701,15 +679,10 @@ export function ChatPanel() {
         ref={scrollRef}
       >
         <div className="space-y-4 xs:space-y-5 sm:space-y-6 max-w-[768px] mx-auto">
-          {/* Show sandbox status indicator when creating */}
-          {(sandboxStatus === "creating" || sandboxStatus === "ready") && chatEntries.length > 0 && (
-            <SandboxIndicator status={sandboxStatus} />
-          )}
-          
           {chatEntries.map((entry) => (
             <ChatMessage key={entry.id} entry={entry} />
           ))}
-          {isAgentRunning && sandboxStatus !== "creating" && (
+          {isAgentRunning && (
             <ThinkingIndicator iteration={currentIteration} maxIterations={maxIterations} />
           )}
         </div>
@@ -733,7 +706,7 @@ export function ChatPanel() {
           </div>
         )}
         
-        {/* Warning banner if API keys or template are missing */}
+        {/* Warning banner if API keys are missing */}
         {!canChat && (
           <div 
             data-design-id="api-key-warning"
@@ -742,12 +715,7 @@ export function ChatPanel() {
           >
             <Settings className="w-4 h-4 text-orange-500" />
             <span className="text-xs text-orange-500">
-              {!activeApiKey && !e2bApiKey 
-                ? "Configure API keys in Settings to start chatting"
-                : !activeApiKey 
-                  ? `${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`
-                  : "E2B API key required for sandbox"
-              }
+              {`${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`}
             </span>
           </div>
         )}

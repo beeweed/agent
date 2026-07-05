@@ -116,9 +116,6 @@ export interface AgentEvent {
     | "code_stream_end"
     | "read_file_start"
     | "read_file_end"
-    | "sandbox_creating"
-    | "sandbox_ready"
-    | "sandbox_error"
     | "replace_in_file_start"
     | "replace_in_file_end"
     | "insert_line_start"
@@ -139,12 +136,12 @@ export interface AgentEvent {
   message?: string;
   chunk?: string;
   file_path?: string;
-  old_string?: string;  // For replace_in_file tool
-  new_string?: string;  // For replace_in_file tool
-  insert_line?: number;  // For insert_line tool
-  new_str?: string;  // For insert_line tool
-  target_line?: number | string;  // For delete_lines_from_file tool
-  target_str?: string;  // For delete_str_from_file tool
+  old_string?: string;
+  new_string?: string;
+  insert_line?: number;
+  new_str?: string;
+  target_line?: number | string;
+  target_str?: string;
 }
 
 export interface Model {
@@ -180,7 +177,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "sandbox_status" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "replace_in_file_card" | "insert_line_card" | "delete_lines_card" | "delete_str_from_file_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced" | "inserting" | "inserted" | "deleting" | "deleted" | "deleting_str" | "deleted_str";
@@ -195,12 +192,11 @@ export interface ChatEntry {
   deleteStrResult?: DeleteStrFromFileResult;
   timestamp: Date;
   isStreaming?: boolean;
-  sandboxStatus?: "creating" | "ready" | "error";
-  oldString?: string;  // For replace_in_file tool
-  newString?: string;  // For replace_in_file tool
-  insertLine?: number;  // For insert_line tool
-  newStr?: string;  // For insert_line tool
-  targetLine?: number | string;  // For delete_lines_from_file tool
-  deletedLines?: string;  // For delete_lines_from_file tool
-  targetStr?: string;  // For delete_str_from_file tool
+  oldString?: string;
+  newString?: string;
+  insertLine?: number;
+  newStr?: string;
+  targetLine?: number | string;
+  deletedLines?: string;
+  targetStr?: string;
 }

@@ -4,10 +4,10 @@ import { useApi } from "@/hooks/useApi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileTree } from "./FileTree";
 import { CodeEditor } from "./CodeEditor";
-import { FolderOpen, RefreshCw, X, ChevronRight, Box } from "lucide-react";
+import { FolderOpen, RefreshCw, X, ChevronRight } from "lucide-react";
 
 export function FilePanel() {
-  const { fileTree, selectedFile, fileContent, setFileContent, openTabs, setSelectedFile, removeTab, sandboxStatus } = useStore();
+  const { fileTree, selectedFile, fileContent, setFileContent, openTabs, setSelectedFile, removeTab } = useStore();
   const { fetchFileTree, refreshFileTree, readFile } = useApi();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -74,19 +74,13 @@ export function FilePanel() {
           <div className="flex items-center gap-1.5 xs:gap-2">
             <FolderOpen className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-muted-foreground" />
             <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Explorer</span>
-            {sandboxStatus === "ready" && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20">
-                <Box className="w-2.5 h-2.5 text-green-500" />
-                <span className="text-[8px] text-green-500 font-medium">E2B</span>
-              </div>
-            )}
           </div>
           <button
             data-design-id="refresh-files-btn"
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={`p-1 xs:p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
-            title="Refresh files from E2B sandbox"
+            title="Refresh files"
           >
             <RefreshCw className="w-3 h-3 xs:w-3.5 xs:h-3.5" />
           </button>
@@ -99,13 +93,11 @@ export function FilePanel() {
             ) : (
               <div className="px-3 xs:px-4 py-6 xs:py-8 text-center">
                 <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-muted flex items-center justify-center">
-                  <Box className="w-5 h-5 text-muted-foreground" />
+                  <FolderOpen className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <p className="text-[11px] xs:text-xs text-muted-foreground mb-1">No files yet</p>
                 <p className="text-[10px] xs:text-[11px] text-muted-foreground/70">
-                  {sandboxStatus === "ready" 
-                    ? "Files will appear here when created" 
-                    : "Start a chat to create files in E2B sandbox"}
+                  Files will appear here when created by the agent
                 </p>
               </div>
             )}

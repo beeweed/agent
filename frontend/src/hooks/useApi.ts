@@ -6,16 +6,69 @@ const getApiBase = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
 
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname.includes("e2b.app")) {
-      return window.location.origin.replace(/\d+-/, "8000-");
-    }
-  }
-  return "http://localhost:8000";
+  return "";
 };
 
 const API_BASE = getApiBase();
+
+function buildFileTree(files: Record<string, string>): FileNode {
+  const root: FileNode = {
+    name: "project",
+    type: "folder",
+    path: "/",
+    children: [],
+  };
+
+  const pathMap: Record<string, FileNode> = { "/": root };
+
+  const sortedPaths = Object.keys(files).sort();
+  for (const filePath of sortedPaths) {
+    const parts = filePath.replace(/^\//, "").split("/");
+    let current = root;
+    let currentPath = "/";
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const childPath = currentPath === "/" ? "/" + part : currentPath + "/" + part;
+
+      if (!pathMap[childPath]) {
+        const node: FileNode = {
+          name: part,
+          type: isLast ? "file" : "folder",
+          path: childPath,
+        };
+        if (!isLast) {
+          node.children = [];
+        }
+        pathMap[childPath] = node;
+
+        if (current.children) {
+          const exists = current.children.some((c) => c.path === childPath);
+          if (!exists) {
+            current.children.push(node);
+          }
+        }
+      }
+
+      current = pathMap[childPath];
+      currentPath = childPath;
+    }
+  }
+
+  const sortChildren = (node: FileNode) => {
+    if (node.children) {
+      node.children.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      node.children.forEach(sortChildren);
+    }
+  };
+  sortChildren(root);
+
+  return root;
+}
 
 export function useApi() {
   const {
@@ -23,8 +76,6 @@ export function useApi() {
     apiKey,
     groqApiKey,
     fireworksApiKey,
-    e2bApiKey,
-    e2bTemplateId,
     selectedModel,
     setModels,
     setModelsLoading,
@@ -75,8 +126,6 @@ export function useApi() {
           message,
           api_key: activeKey,
           model: selectedModel,
-          e2b_api_key: e2bApiKey,
-          e2b_template_id: e2bTemplateId || undefined,
           provider: provider,
         }),
       });
@@ -111,53 +160,22 @@ export function useApi() {
         }
       }
     },
-    [provider, apiKey, groqApiKey, fireworksApiKey, e2bApiKey, e2bTemplateId, selectedModel]
+    [provider, apiKey, groqApiKey, fireworksApiKey, selectedModel]
   );
 
-  const fetchFileTree = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/files`);
-      const data = (await response.json()) as FileNode;
-      setFileTree(data);
-      return data;
-    } catch (error) {
-      console.error("Failed to fetch file tree:", error);
-      return null;
-    }
+  const fetchFileTree = useCallback(() => {
+    const tree = buildFileTree(useStore.getState().localFiles);
+    setFileTree(tree);
+    return tree;
   }, [setFileTree]);
 
-  const refreshFileTree = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/files/refresh`, {
-        method: "POST",
-      });
-      const data = (await response.json()) as FileNode;
-      setFileTree(data);
-      return data;
-    } catch (error) {
-      console.error("Failed to refresh file tree:", error);
-      return null;
-    }
-  }, [setFileTree]);
+  const refreshFileTree = useCallback(() => {
+    return fetchFileTree();
+  }, [fetchFileTree]);
 
   const readFile = useCallback(async (filePath: string): Promise<string> => {
-    try {
-      let adjustedPath = filePath;
-      if (!filePath.startsWith("/home/user/")) {
-        adjustedPath = `/home/user${filePath}`;
-      }
-      
-      const response = await fetch(`${API_BASE}/api/files/read`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_path: adjustedPath }),
-      });
-      const data = await response.json();
-      return data.content || "";
-    } catch (error) {
-      console.error("Failed to read file:", error);
-      return "";
-    }
+    const files = useStore.getState().localFiles;
+    return files[filePath] || "";
   }, []);
 
   const fetchMemory = useCallback(async () => {
@@ -175,7 +193,8 @@ export function useApi() {
   const resetChat = useCallback(async () => {
     try {
       await fetch(`${API_BASE}/api/chat/reset`, { method: "POST" });
-      await fetchFileTree();
+      useStore.getState().clearLocalFiles();
+      fetchFileTree();
       await fetchMemory();
     } catch (error) {
       console.error("Failed to reset chat:", error);
@@ -190,35 +209,6 @@ export function useApi() {
     }
   }, []);
 
-  const getSandboxStatus = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/sandbox/status`);
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to get sandbox status:", error);
-      return null;
-    }
-  }, []);
-
-  const sandboxKeepalive = useCallback(async () => {
-    if (!e2bApiKey) return null;
-    
-    try {
-      const response = await fetch(`${API_BASE}/api/sandbox/keepalive`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          e2b_api_key: e2bApiKey,
-          session_id: "default",
-        }),
-      });
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to keepalive sandbox:", error);
-      return null;
-    }
-  }, [e2bApiKey]);
-
   return {
     getActiveApiKey,
     fetchModels,
@@ -229,7 +219,5 @@ export function useApi() {
     fetchMemory,
     resetChat,
     stopAgent,
-    getSandboxStatus,
-    sandboxKeepalive,
   };
 }
