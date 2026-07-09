@@ -5,18 +5,13 @@ import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
 import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult } from "@/types";
-import { 
-  Send,
-  Settings,
-  RotateCcw,
-  Lightbulb,
-} from "lucide-react";
+import { Send, Settings, RotateCcw, Lightbulb } from "lucide-react";
 
 export function ChatPanel() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
+
   const {
     chatEntries,
     addChatEntry,
@@ -32,11 +27,16 @@ export function ChatPanel() {
     apiKey,
     groqApiKey,
     fireworksApiKey,
+    novitaApiKey,
+    sandboxStatus,
+    setSandboxStatus,
+    sandboxMessage,
+    setSandboxMessage,
     setCodeStreaming,
     resetCodeStreaming,
     updateLocalFile,
   } = useStore();
-  
+
   const { sendMessage, fetchFileTree, fetchMemory, resetChat, stopAgent } = useApi();
 
   const scrollToBottom = useCallback(() => {
@@ -47,21 +47,26 @@ export function ChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatEntries, scrollToBottom]);
+  }, [chatEntries, sandboxStatus, sandboxMessage, scrollToBottom]);
+
+  const activeApiKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
+  const hasLlmKey = !!activeApiKey;
+  const hasSandboxKey = !!novitaApiKey.trim();
+  const canChat = hasLlmKey && hasSandboxKey;
 
   const handleSubmit = async () => {
     if (!input.trim() || isAgentRunning) return;
-    
-    // Check for LLM provider API key
-    if (!activeApiKey) {
+
+    if (!hasLlmKey || !hasSandboxKey) {
       setIsSettingsOpen(true);
       return;
     }
 
+    const trimmedInput = input.trim();
     const userEntry: ChatEntry = {
       id: crypto.randomUUID(),
       type: "user",
-      content: input.trim(),
+      content: trimmedInput,
       timestamp: new Date(),
     };
     addChatEntry(userEntry);
@@ -75,33 +80,52 @@ export function ChatPanel() {
     let currentReadFileCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
 
-
     try {
-      await sendMessage(input.trim(), (event: AgentEvent) => {
+      await sendMessage(trimmedInput, (event: AgentEvent) => {
         switch (event.type) {
+          case "sandbox_creation_start":
+            setSandboxStatus("creating");
+            setSandboxMessage(event.message || "Creating sandbox...");
+            break;
+
+          case "sandbox_creation_log":
+            setSandboxStatus("creating");
+            setSandboxMessage(event.message || "Creating sandbox...");
+            break;
+
+          case "sandbox_creation_end":
+            setSandboxStatus("ready");
+            setSandboxMessage(event.message || "Sandbox ready");
+            void fetchFileTree();
+            break;
+
+          case "sandbox_error":
+            setSandboxStatus("error");
+            setSandboxMessage(event.error || "Sandbox creation failed");
+            break;
+
           case "iteration":
             setCurrentIteration(event.iteration || 0);
             break;
-          
-          case "thought_stream_start":
-            {
-              const thoughtEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "assistant",
-                content: "",
-                iteration: event.iteration,
-                timestamp: new Date(),
-                isStreaming: true,
-              };
-              currentThoughtId = thoughtEntry.id;
-              addChatEntry(thoughtEntry);
-            }
+
+          case "thought_stream_start": {
+            const thoughtEntry: ChatEntry = {
+              id: crypto.randomUUID(),
+              type: "assistant",
+              content: "",
+              iteration: event.iteration,
+              timestamp: new Date(),
+              isStreaming: true,
+            };
+            currentThoughtId = thoughtEntry.id;
+            addChatEntry(thoughtEntry);
             break;
-            
+          }
+
           case "thought_stream_chunk":
             if (currentThoughtId && event.chunk) {
               const store = useStore.getState();
-              const entry = store.chatEntries.find(e => e.id === currentThoughtId);
+              const entry = store.chatEntries.find((e) => e.id === currentThoughtId);
               if (entry) {
                 updateChatEntry(currentThoughtId, {
                   content: (entry.content || "") + event.chunk,
@@ -109,7 +133,7 @@ export function ChatPanel() {
               }
             }
             break;
-            
+
           case "thought_stream_end":
             if (currentThoughtId) {
               updateChatEntry(currentThoughtId, {
@@ -119,7 +143,7 @@ export function ChatPanel() {
               currentThoughtId = null;
             }
             break;
-            
+
           case "thought":
             if (event.content) {
               const thoughtEntry: ChatEntry = {
@@ -132,45 +156,36 @@ export function ChatPanel() {
               addChatEntry(thoughtEntry);
             }
             break;
-            
-          case "code_stream_start":
-            {
-              const filePath = event.file_path || "";
-              console.log("[CODE_STREAM_START]", filePath);
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Editor",
-                action: `Editing ${filePath}`,
-              });
-              
-              const fileEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "file_card",
-                filePath,
-                fileStatus: "writing",
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentFileCardId = fileEntry.id;
-              addChatEntry(fileEntry);
-            }
+
+          case "code_stream_start": {
+            const filePath = event.file_path || "";
+            setCodeStreaming({
+              filePath,
+              content: "",
+              isStreaming: true,
+              tool: "Editor",
+              action: `Editing ${filePath}`,
+            });
+
+            const fileEntry: ChatEntry = {
+              id: crypto.randomUUID(),
+              type: "file_card",
+              filePath,
+              fileStatus: "writing",
+              iteration: event.iteration,
+              timestamp: new Date(),
+            };
+            currentFileCardId = fileEntry.id;
+            addChatEntry(fileEntry);
             break;
-            
+          }
+
           case "code_stream_chunk":
             if (event.chunk) {
-              console.log("[CODE_STREAM_CHUNK]", event.chunk.slice(0, 20) + "...");
               useStore.getState().appendStreamingCode(event.chunk);
             }
             break;
-            
-          case "code_stream_end":
-            break;
-            
-          case "tool_call":
-            break;
-            
+
           case "tool_result":
             if (event.tool_name === "file_write") {
               if (currentFileCardId) {
@@ -179,7 +194,6 @@ export function ChatPanel() {
                 });
                 currentFileCardId = null;
               }
-              // Store file content locally
               if (event.result?.success) {
                 const r = event.result as unknown as Record<string, unknown>;
                 if (r.file_path && r.content) {
@@ -187,134 +201,108 @@ export function ChatPanel() {
                 }
               }
               setCodeStreaming({ isStreaming: false });
-              fetchFileTree();
-            }
-            break;
-          
-          case "read_file_start":
-            {
-              const filePath = event.file_path || "";
-              console.log("[READ_FILE_START]", filePath);
-              
-              // Show read file content in computer panel
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Reader",
-                action: `Reading ${filePath}`,
-              });
-              
-              // Create read file card entry
-              const readFileEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "read_file_card",
-                filePath,
-                fileStatus: "reading",
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentReadFileCardId = readFileEntry.id;
-              addChatEntry(readFileEntry);
-            }
-            break;
-          
-          case "read_file_end":
-            {
-              const result = event.result as ReadFileResult;
-              console.log("[READ_FILE_END]", event.file_path, result?.success);
-              
-              // Update the read file card with result
-              if (currentReadFileCardId) {
-                updateChatEntry(currentReadFileCardId, {
-                  fileStatus: result?.success ? "read" : "error",
-                  readResult: result,
-                });
-                currentReadFileCardId = null;
-              }
-              
-              // Display the file content in computer panel
-              if (result?.success && result?.content) {
-                setCodeStreaming({
-                  filePath: event.file_path || "",
-                  content: result.content,
-                  isStreaming: false,
-                  tool: "Reader",
-                  action: `Read ${event.file_path}`,
-                });
-              } else {
-                setCodeStreaming({ isStreaming: false });
-              }
-            }
-            break;
-          
-          case "replace_in_file_start":
-            {
-              const filePath = event.file_path || "";
-              const oldString = event.old_string || "";
-              const newString = event.new_string || "";
-              console.log("[REPLACE_IN_FILE_START]", filePath);
-              
-              // Show diff view in computer panel
-              setCodeStreaming({
-                filePath,
-                content: "",
-                isStreaming: true,
-                tool: "Replace",
-                action: `Updating ${filePath}`,
-                isDiffView: true,
-                oldString,
-                newString,
-              });
-              
-              // Create replace in file card entry
-              const replaceEntry: ChatEntry = {
-                id: crypto.randomUUID(),
-                type: "replace_in_file_card",
-                filePath,
-                fileStatus: "replacing",
-                oldString,
-                newString,
-                iteration: event.iteration,
-                timestamp: new Date(),
-              };
-              currentReplaceInFileCardId = replaceEntry.id;
-              addChatEntry(replaceEntry);
-            }
-            break;
-          
-          case "replace_in_file_end":
-            {
-              const result = event.result as ReplaceInFileResult;
-              console.log("[REPLACE_IN_FILE_END]", event.file_path, result?.success);
-              
-              // Update the replace in file card with result
-              if (currentReplaceInFileCardId) {
-                updateChatEntry(currentReplaceInFileCardId, {
-                  fileStatus: result?.success ? "replaced" : "error",
-                  replaceResult: result,
-                });
-                currentReplaceInFileCardId = null;
-              }
-              
-              // Update local file storage with new content
-              if (result?.success) {
-                const r = result as unknown as Record<string, unknown>;
-                if (r.file_path && r.new_content) {
-                  updateLocalFile(r.file_path as string, r.new_content as string);
-                }
-              }
-              
-              // Keep showing the diff view but mark streaming as complete
-              setCodeStreaming({ 
-                isStreaming: false,
-              });
-              
-              // Refresh file tree after replacement
-              fetchFileTree();
+              void fetchFileTree();
             }
             break;
 
+          case "read_file_start": {
+            const filePath = event.file_path || "";
+            setCodeStreaming({
+              filePath,
+              content: "",
+              isStreaming: true,
+              tool: "Reader",
+              action: `Reading ${filePath}`,
+            });
+
+            const readFileEntry: ChatEntry = {
+              id: crypto.randomUUID(),
+              type: "read_file_card",
+              filePath,
+              fileStatus: "reading",
+              iteration: event.iteration,
+              timestamp: new Date(),
+            };
+            currentReadFileCardId = readFileEntry.id;
+            addChatEntry(readFileEntry);
+            break;
+          }
+
+          case "read_file_end": {
+            const result = event.result as ReadFileResult;
+            if (currentReadFileCardId) {
+              updateChatEntry(currentReadFileCardId, {
+                fileStatus: result?.success ? "read" : "error",
+                readResult: result,
+              });
+              currentReadFileCardId = null;
+            }
+
+            if (result?.success && result?.content) {
+              setCodeStreaming({
+                filePath: event.file_path || "",
+                content: result.content,
+                isStreaming: false,
+                tool: "Reader",
+                action: `Read ${event.file_path}`,
+              });
+              if (result.raw_content && event.file_path) {
+                updateLocalFile(event.file_path, result.raw_content);
+              }
+            } else {
+              setCodeStreaming({ isStreaming: false });
+            }
+            break;
+          }
+
+          case "replace_in_file_start": {
+            const filePath = event.file_path || "";
+            const oldString = event.old_string || "";
+            const newString = event.new_string || "";
+            setCodeStreaming({
+              filePath,
+              content: "",
+              isStreaming: true,
+              tool: "Replace",
+              action: `Updating ${filePath}`,
+              isDiffView: true,
+              oldString,
+              newString,
+            });
+
+            const replaceEntry: ChatEntry = {
+              id: crypto.randomUUID(),
+              type: "replace_in_file_card",
+              filePath,
+              fileStatus: "replacing",
+              oldString,
+              newString,
+              iteration: event.iteration,
+              timestamp: new Date(),
+            };
+            currentReplaceInFileCardId = replaceEntry.id;
+            addChatEntry(replaceEntry);
+            break;
+          }
+
+          case "replace_in_file_end": {
+            const result = event.result as ReplaceInFileResult;
+            if (currentReplaceInFileCardId) {
+              updateChatEntry(currentReplaceInFileCardId, {
+                fileStatus: result?.success ? "replaced" : "error",
+                replaceResult: result,
+              });
+              currentReplaceInFileCardId = null;
+            }
+
+            if (result?.success && result.file_path && result.new_content) {
+              updateLocalFile(result.file_path, result.new_content);
+            }
+
+            setCodeStreaming({ isStreaming: false });
+            void fetchFileTree();
+            break;
+          }
 
           case "tool_error":
             if (currentFileCardId) {
@@ -331,13 +319,13 @@ export function ChatPanel() {
             }
             setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
-            
+
           case "complete":
-            fetchMemory();
-            fetchFileTree();  // Refresh file tree after completion
+            void fetchMemory();
+            void fetchFileTree();
             setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
-            
+
           case "max_iterations_reached":
             addChatEntry({
               id: crypto.randomUUID(),
@@ -347,7 +335,7 @@ export function ChatPanel() {
             });
             setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
-            
+
           case "error":
             addChatEntry({
               id: crypto.randomUUID(),
@@ -357,7 +345,7 @@ export function ChatPanel() {
             });
             setCodeStreaming({ isStreaming: false, isDiffView: false });
             break;
-            
+
           case "stream_end":
             setIsAgentRunning(false);
             setCodeStreaming({ isStreaming: false, isDiffView: false });
@@ -365,6 +353,8 @@ export function ChatPanel() {
         }
       });
     } catch (error) {
+      setSandboxStatus("error");
+      setSandboxMessage(error instanceof Error ? error.message : "Unknown error");
       addChatEntry({
         id: crypto.randomUUID(),
         type: "assistant",
@@ -380,7 +370,7 @@ export function ChatPanel() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      void handleSubmit();
     }
   };
 
@@ -389,6 +379,8 @@ export function ChatPanel() {
     useStore.getState().clearChat();
     setCurrentIteration(0);
     resetCodeStreaming();
+    setSandboxStatus("idle");
+    setSandboxMessage("");
   };
 
   const handleStop = async () => {
@@ -397,31 +389,27 @@ export function ChatPanel() {
     setCodeStreaming({ isStreaming: false });
   };
 
-  const activeApiKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
-  const canChat = !!activeApiKey;
+  const missingMessage = !hasLlmKey
+    ? `${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`
+    : !hasSandboxKey
+      ? "Novita sandbox API key required"
+      : "";
 
   return (
-    <div 
-      data-design-id="chat-panel"
-      className="flex flex-col h-full w-full overflow-hidden"
-    >
-      <div 
-        data-design-id="chat-header"
-        className="flex items-center justify-between py-2 xs:py-3 sm:py-4 border-b border-border"
-      >
+    <div data-design-id="chat-panel" className="flex flex-col h-full w-full overflow-hidden">
+      <div data-design-id="chat-header" className="flex items-center justify-between py-2 xs:py-3 sm:py-4 border-b border-border">
         <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 min-w-0">
           <div className="w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-md xs:rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
             <span className="text-primary-foreground font-bold text-[10px] xs:text-xs sm:text-sm">A</span>
           </div>
           <h1 data-design-id="chat-title" className="text-xs xs:text-sm sm:text-base font-semibold text-foreground truncate max-w-[100px] xs:max-w-[150px] sm:max-w-[300px]">
-            {chatEntries.length > 0 && chatEntries[0].type === "user" 
-              ? (chatEntries[0].content?.slice(0, 40) + (chatEntries[0].content && chatEntries[0].content.length > 40 ? "..." : ""))
-              : "Anygent"
-            }
+            {chatEntries.length > 0 && chatEntries[0].type === "user"
+              ? (chatEntries[0].content?.slice(0, 40) + ((chatEntries[0].content?.length || 0) > 40 ? "..." : ""))
+              : "Anygent"}
           </h1>
         </div>
         <div className="flex items-center gap-0 xs:gap-0.5 sm:gap-1 flex-shrink-0">
-          <button 
+          <button
             data-design-id="memory-btn"
             onClick={() => setIsMemoryOpen(true)}
             className="w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors"
@@ -429,7 +417,7 @@ export function ChatPanel() {
           >
             <Lightbulb className="w-4 h-4" />
           </button>
-          <button 
+          <button
             data-design-id="reset-btn"
             onClick={handleReset}
             className="w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent transition-colors"
@@ -437,15 +425,11 @@ export function ChatPanel() {
           >
             <RotateCcw className="w-4 h-4" />
           </button>
-          
-          <button 
+
+          <button
             data-design-id="settings-btn"
             onClick={() => setIsSettingsOpen(true)}
-            className={`w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg transition-colors ${
-              !canChat 
-                ? "text-orange-500 hover:text-orange-600 hover:bg-orange-500/10 animate-pulse" 
-                : "text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent"
-            }`}
+            className={`w-8 h-8 xs:w-9 xs:h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md xs:rounded-lg transition-colors ${!canChat ? "text-orange-500 hover:text-orange-600 hover:bg-orange-500/10 animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent"}`}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -453,23 +437,24 @@ export function ChatPanel() {
         </div>
       </div>
 
-      <div 
-        data-design-id="chat-messages"
-        className="flex-1 min-h-0 overflow-y-auto py-2 xs:py-3 sm:py-5 scrollbar-none"
-        ref={scrollRef}
-      >
+      <div data-design-id="chat-messages" className="flex-1 min-h-0 overflow-y-auto py-2 xs:py-3 sm:py-5 scrollbar-none" ref={scrollRef}>
         <div className="space-y-4 xs:space-y-5 sm:space-y-6 max-w-[768px] mx-auto">
           {chatEntries.map((entry) => (
             <ChatMessage key={entry.id} entry={entry} />
           ))}
           {isAgentRunning && (
-            <ThinkingIndicator iteration={currentIteration} maxIterations={maxIterations} />
+            <ThinkingIndicator
+              iteration={currentIteration}
+              maxIterations={maxIterations}
+              mode={sandboxStatus === "creating" ? "creating-sandbox" : "thinking"}
+              message={sandboxMessage || undefined}
+            />
           )}
         </div>
       </div>
 
       <div data-design-id="chat-input-area" className="flex-shrink-0 py-2 xs:py-3 bg-background">
-        {isAgentRunning && (
+        {isAgentRunning && sandboxStatus !== "creating" && currentIteration > 0 && (
           <div className="flex items-center justify-between mb-2 xs:mb-3 px-1">
             <div className="inline-flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 py-0.5 xs:py-1 rounded-md xs:rounded-lg bg-primary/10 border border-primary/20">
               <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
@@ -485,31 +470,25 @@ export function ChatPanel() {
             </button>
           </div>
         )}
-        
-        {/* Warning banner if API keys are missing */}
+
         {!canChat && (
-          <div 
+          <div
             data-design-id="api-key-warning"
             onClick={() => setIsSettingsOpen(true)}
             className="flex items-center gap-2 mb-2 xs:mb-3 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20 cursor-pointer hover:bg-orange-500/15 transition-colors"
           >
             <Settings className="w-4 h-4 text-orange-500" />
-            <span className="text-xs text-orange-500">
-              {`${provider === "groq" ? "Groq" : provider === "fireworks" ? "Fireworks" : "OpenRouter"} API key required`}
-            </span>
+            <span className="text-xs text-orange-500">{missingMessage}</span>
           </div>
         )}
-        
+
         <div data-design-id="input-wrapper" className="w-full">
-          <div 
-            data-design-id="input-area"
-            className="flex flex-col min-h-[80px] xs:min-h-[90px] sm:min-h-[140px] p-2 xs:p-2.5 sm:p-5 pb-2 xs:pb-2.5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-card shadow-sm border border-border"
-          >
+          <div data-design-id="input-area" className="flex flex-col min-h-[80px] xs:min-h-[90px] sm:min-h-[140px] p-2 xs:p-2.5 sm:p-5 pb-2 xs:pb-2.5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-card shadow-sm border border-border">
             <div className="flex-1 flex flex-col justify-between">
               <textarea
                 ref={textareaRef}
                 data-design-id="chat-textarea"
-                placeholder={canChat ? "Ask Anygent to help you..." : "Configure API keys in Settings to start..."}
+                placeholder={canChat ? "Ask Anygent to help you..." : "Configure your LLM key and Novita sandbox key in Settings to start..."}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -517,15 +496,15 @@ export function ChatPanel() {
                 disabled={isAgentRunning || !canChat}
                 rows={2}
               />
-              
+
               <div data-design-id="input-actions" className="flex items-center justify-between mt-1 xs:mt-2">
                 <div className="flex items-center gap-1 xs:gap-2">
                   <ModelSelector />
                 </div>
-                
+
                 <button
                   data-design-id="send-btn"
-                  onClick={handleSubmit}
+                  onClick={() => void handleSubmit()}
                   disabled={isAgentRunning || !input.trim() || !canChat}
                   className="w-9 h-9 xs:w-10 xs:h-10 sm:w-8 sm:h-8 rounded-lg bg-primary flex items-center justify-center hover:brightness-105 active:scale-95 transition-all disabled:bg-accent disabled:cursor-not-allowed"
                 >

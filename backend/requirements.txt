@@ -13,3 +13,4 @@ python-jose[cryptography]
 python-multipart
 cryptography
 requests
+novita-sandbox==2.0.6

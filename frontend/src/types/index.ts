@@ -46,6 +46,7 @@ export interface FileNode {
 export interface ReadFileResult {
   success: boolean;
   content?: string;
+  raw_content?: string;
   file_path?: string;
   file_name?: string;
   file_extension?: string;
@@ -64,11 +65,24 @@ export interface ReplaceInFileResult {
   old_string?: string;
   new_string?: string;
   occurrences?: number;
+  new_content?: string;
   error?: string;
 }
 
+export interface SandboxStatusResponse {
+  session_id: string;
+  provider: string;
+  sandbox_id?: string | null;
+  status: "idle" | "creating" | "ready" | "error" | "paused";
+  template_id?: string | null;
+  root_path?: string;
+  last_error?: string | null;
+  created_at?: string | null;
+  updated_at?: string;
+}
+
 export interface AgentEvent {
-  type: 
+  type:
     | "iteration_start"
     | "iteration"
     | "thought"
@@ -88,7 +102,11 @@ export interface AgentEvent {
     | "read_file_start"
     | "read_file_end"
     | "replace_in_file_start"
-    | "replace_in_file_end";
+    | "replace_in_file_end"
+    | "sandbox_creation_start"
+    | "sandbox_creation_log"
+    | "sandbox_creation_end"
+    | "sandbox_error";
   content?: string;
   error?: string;
   iteration?: number;

@@ -381,6 +381,49 @@
 .thinking-dots .dot:nth-child(7) { animation-delay: 0.9s; }
 .thinking-dots .dot:nth-child(8) { animation-delay: 1.05s; }
 
+@keyframes sandbox-ring {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes sandbox-shine {
+  0% { transform: translateX(-140%); opacity: 0; }
+  20% { opacity: 0.25; }
+  55% { opacity: 0.6; }
+  100% { transform: translateX(180%); opacity: 0; }
+}
+
+.sandbox-orbit-wrapper {
+  position: relative;
+  border-radius: 999px;
+}
+
+.sandbox-orbit-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  box-shadow: 0 0 28px rgba(34, 211, 238, 0.18);
+  animation: sandbox-ring 3.2s linear infinite;
+}
+
+.sandbox-status-pill {
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 32px rgba(6, 182, 212, 0.08);
+}
+
+.sandbox-status-shine::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -30%;
+  width: 32%;
+  transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: sandbox-shine 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
 /* Message content styles */
 .message-content p:first-child {
   margin-top: 0;

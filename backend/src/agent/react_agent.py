@@ -26,6 +26,7 @@ from .tool_executor import TOOL_EXECUTORS
 from ..services.openrouter import chat_completion as openrouter_chat_completion
 from ..services.groq import chat_completion as groq_chat_completion
 from ..services.fireworks import chat_completion as fireworks_chat_completion
+from ..sandbox import SandboxConfig, SandboxManager
 
 
 class StreamingToolParser:
@@ -165,6 +166,8 @@ class ReActAgent:
         max_iterations: int = 500,
         session_id: str = "default",
         provider: str = "openrouter",
+        sandbox_manager: Optional[SandboxManager] = None,
+        sandbox_config: Optional[SandboxConfig] = None,
     ):
         self.api_key = api_key
         self.model = model
@@ -174,6 +177,8 @@ class ReActAgent:
         self.current_iteration = 0
         self.is_running = False
         self.session_id = session_id
+        self.sandbox_manager = sandbox_manager
+        self.sandbox_config = sandbox_config
 
     # ------------------------------------------------------------------
     # Message helpers
@@ -182,6 +187,24 @@ class ReActAgent:
     def _get_messages(self) -> list:
         return [{"role": "system", "content": get_system_prompt()}] + self.context.get_messages()
 
+    def update_sandbox_config(self, sandbox_config: Optional[SandboxConfig]) -> None:
+        self.sandbox_config = sandbox_config
+
+    async def _ensure_sandbox_ready(self) -> tuple[bool, list[str], str | None]:
+        if self.sandbox_manager is None or self.sandbox_config is None:
+            return False, [], "Sandbox is not configured for this session."
+
+        logs: list[str] = []
+        try:
+            await self.sandbox_manager.ensure_ready(
+                self.session_id,
+                self.sandbox_config,
+                log=lambda message: logs.append(message),
+            )
+            return True, logs, None
+        except Exception as exc:
+            return False, logs, str(exc)
+
     # ------------------------------------------------------------------
     # Main agent loop
     # ------------------------------------------------------------------
@@ -189,6 +212,23 @@ class ReActAgent:
     async def run(self, user_message: str, on_event: Optional[Callable] = None) -> AsyncGenerator:
         self.is_running = True
         self.current_iteration = 0
+
+        sandbox_state = self.sandbox_manager.get_state(self.session_id) if self.sandbox_manager else None
+        show_creation_ui = sandbox_state is None or sandbox_state.status != "ready" or sandbox_state.sandbox is None
+        if show_creation_ui:
+            yield {"type": "sandbox_creation_start", "message": "Creating sandbox...", "iteration": 0}
+        ok, sandbox_logs, sandbox_error = await self._ensure_sandbox_ready()
+        if show_creation_ui:
+            for message in sandbox_logs:
+                yield {"type": "sandbox_creation_log", "message": message, "iteration": 0}
+        if not ok:
+            if show_creation_ui:
+                yield {"type": "sandbox_error", "error": sandbox_error or "Failed to create sandbox.", "iteration": 0}
+            yield {"type": "error", "error": sandbox_error or "Failed to create sandbox.", "iteration": 0}
+            self.is_running = False
+            return
+        if show_creation_ui:
+            yield {"type": "sandbox_creation_end", "message": "Sandbox ready", "iteration": 0}
 
         self.context.add_user_message(user_message)
         yield {"type": "iteration_start", "iteration": 0, "max_iterations": self.max_iterations}

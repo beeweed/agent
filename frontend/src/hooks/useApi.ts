@@ -1,74 +1,22 @@
 import { useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import type { AgentEvent, FileNode, Model, Memory } from "@/types";
+import type { AgentEvent, FileNode, Memory, Model, SandboxStatusResponse } from "@/types";
 
 const getApiBase = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
-
   return "";
 };
 
 const API_BASE = getApiBase();
+const DEFAULT_SESSION_ID = "default";
 
-function buildFileTree(files: Record<string, string>): FileNode {
-  const root: FileNode = {
-    name: "project",
-    type: "folder",
-    path: "/",
-    children: [],
-  };
-
-  const pathMap: Record<string, FileNode> = { "/": root };
-
-  const sortedPaths = Object.keys(files).sort();
-  for (const filePath of sortedPaths) {
-    const parts = filePath.replace(/^\//, "").split("/");
-    let current = root;
-    let currentPath = "/";
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const childPath = currentPath === "/" ? "/" + part : currentPath + "/" + part;
-
-      if (!pathMap[childPath]) {
-        const node: FileNode = {
-          name: part,
-          type: isLast ? "file" : "folder",
-          path: childPath,
-        };
-        if (!isLast) {
-          node.children = [];
-        }
-        pathMap[childPath] = node;
-
-        if (current.children) {
-          const exists = current.children.some((c) => c.path === childPath);
-          if (!exists) {
-            current.children.push(node);
-          }
-        }
-      }
-
-      current = pathMap[childPath];
-      currentPath = childPath;
-    }
-  }
-
-  const sortChildren = (node: FileNode) => {
-    if (node.children) {
-      node.children.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
-      node.children.forEach(sortChildren);
-    }
-  };
-  sortChildren(root);
-
-  return root;
-}
+const EMPTY_FILE_TREE: FileNode = {
+  name: "user",
+  type: "folder",
+  path: "/home/user",
+  children: [],
+};
 
 export function useApi() {
   const {
@@ -76,11 +24,14 @@ export function useApi() {
     apiKey,
     groqApiKey,
     fireworksApiKey,
-    selectedModel,
+    novitaApiKey,
+    novitaTemplateId,
     setModels,
     setModelsLoading,
     setFileTree,
     setMemory,
+    setLocalFiles,
+    updateLocalFile,
   } = useStore();
 
   const getActiveApiKey = useCallback(() => {
@@ -90,9 +41,9 @@ export function useApi() {
   }, [provider, apiKey, groqApiKey, fireworksApiKey]);
 
   const fetchModels = useCallback(async () => {
-    const activeKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
+    const activeKey = getActiveApiKey();
     if (!activeKey) return;
-    
+
     setModelsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/models`, {
@@ -100,10 +51,10 @@ export function useApi() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           api_key: activeKey,
-          provider: provider,
+          provider,
         }),
       });
-      
+
       const data = await response.json();
       if (data.success) {
         setModels(data.models as Model[]);
@@ -113,11 +64,11 @@ export function useApi() {
     } finally {
       setModelsLoading(false);
     }
-  }, [provider, apiKey, groqApiKey, fireworksApiKey, setModels, setModelsLoading]);
+  }, [getActiveApiKey, provider, setModels, setModelsLoading]);
 
   const sendMessage = useCallback(
     async (message: string, onEvent: (event: AgentEvent) => void) => {
-      const activeKey = provider === "groq" ? groqApiKey : provider === "fireworks" ? fireworksApiKey : apiKey;
+      const activeKey = getActiveApiKey();
 
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
@@ -125,13 +76,23 @@ export function useApi() {
         body: JSON.stringify({
           message,
           api_key: activeKey,
-          model: selectedModel,
-          provider: provider,
+          model: useStore.getState().selectedModel,
+          provider,
+          session_id: DEFAULT_SESSION_ID,
+          novita_api_key: novitaApiKey,
+          novita_template_id: novitaTemplateId || undefined,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch {
+          // ignore json parsing failure
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
@@ -160,27 +121,67 @@ export function useApi() {
         }
       }
     },
-    [provider, apiKey, groqApiKey, fireworksApiKey, selectedModel]
+    [getActiveApiKey, provider, novitaApiKey, novitaTemplateId]
   );
 
-  const fetchFileTree = useCallback(() => {
-    const tree = buildFileTree(useStore.getState().localFiles);
-    setFileTree(tree);
-    return tree;
+  const fetchSandboxStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/sandbox/status?session_id=${DEFAULT_SESSION_ID}`);
+      if (!response.ok) return null;
+      return (await response.json()) as SandboxStatusResponse;
+    } catch (error) {
+      console.error("Failed to fetch sandbox status:", error);
+      return null;
+    }
+  }, []);
+
+  const fetchFileTree = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/files/tree?session_id=${DEFAULT_SESSION_ID}`);
+      if (!response.ok) {
+        setFileTree(EMPTY_FILE_TREE);
+        return EMPTY_FILE_TREE;
+      }
+      const data = (await response.json()) as FileNode;
+      setFileTree(data);
+      return data;
+    } catch (error) {
+      console.error("Failed to fetch file tree:", error);
+      setFileTree(EMPTY_FILE_TREE);
+      return EMPTY_FILE_TREE;
+    }
   }, [setFileTree]);
 
-  const refreshFileTree = useCallback(() => {
+  const refreshFileTree = useCallback(async () => {
     return fetchFileTree();
   }, [fetchFileTree]);
 
   const readFile = useCallback(async (filePath: string): Promise<string> => {
-    const files = useStore.getState().localFiles;
-    return files[filePath] || "";
-  }, []);
+    const cached = useStore.getState().localFiles[filePath];
+    if (cached) return cached;
+
+    try {
+      const params = new URLSearchParams({
+        session_id: DEFAULT_SESSION_ID,
+        file_path: filePath,
+      });
+      const response = await fetch(`${API_BASE}/api/files/content?${params.toString()}`);
+      if (!response.ok) {
+        return "";
+      }
+      const data = (await response.json()) as { raw_content?: string };
+      const content = data.raw_content || "";
+      updateLocalFile(filePath, content);
+      return content;
+    } catch (error) {
+      console.error("Failed to read file:", error);
+      return "";
+    }
+  }, [updateLocalFile]);
 
   const fetchMemory = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/memory`);
+      const response = await fetch(`${API_BASE}/api/memory?session_id=${DEFAULT_SESSION_ID}`);
       const data = (await response.json()) as Memory;
       setMemory(data);
       return data;
@@ -192,18 +193,18 @@ export function useApi() {
 
   const resetChat = useCallback(async () => {
     try {
-      await fetch(`${API_BASE}/api/chat/reset`, { method: "POST" });
-      useStore.getState().clearLocalFiles();
-      fetchFileTree();
+      await fetch(`${API_BASE}/api/chat/reset?session_id=${DEFAULT_SESSION_ID}`, { method: "POST" });
+      setLocalFiles({});
+      setFileTree(EMPTY_FILE_TREE);
       await fetchMemory();
     } catch (error) {
       console.error("Failed to reset chat:", error);
     }
-  }, [fetchFileTree, fetchMemory]);
+  }, [fetchMemory, setFileTree, setLocalFiles]);
 
   const stopAgent = useCallback(async () => {
     try {
-      await fetch(`${API_BASE}/api/chat/stop`, { method: "POST" });
+      await fetch(`${API_BASE}/api/chat/stop?session_id=${DEFAULT_SESSION_ID}`, { method: "POST" });
     } catch (error) {
       console.error("Failed to stop agent:", error);
     }
@@ -213,6 +214,7 @@ export function useApi() {
     getActiveApiKey,
     fetchModels,
     sendMessage,
+    fetchSandboxStatus,
     fetchFileTree,
     refreshFileTree,
     readFile,
