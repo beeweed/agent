@@ -77,6 +77,25 @@ class SandboxManager:
         provider = self._provider(state.provider)
         return await asyncio.to_thread(provider.run_command, state, cmd, cwd)
 
+    async def run_terminal_command(
+        self,
+        session_id: str,
+        session_name: str,
+        command: str,
+        wait_for_output: bool = True,
+        timeout_seconds: int = 180,
+    ) -> dict:
+        state = self.get_state(session_id)
+        provider = self._provider(state.provider)
+        return await asyncio.to_thread(
+            provider.run_terminal_command,
+            state,
+            session_name,
+            command,
+            wait_for_output,
+            timeout_seconds,
+        )
+
     async def reset_session(self, session_id: str) -> None:
         state = self.get_state(session_id)
         provider = self._provider(state.provider)

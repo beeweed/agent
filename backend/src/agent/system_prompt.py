@@ -23,6 +23,7 @@ VIBE_CODER_SYSTEM_PROMPT = """You are Vibe Coder, an autonomous AI agent special
 8. After completing all files, provide a brief summary
 9. When editing existing files, prefer targeted edits (replace, insert, delete) over rewriting entire files
 10. Always read a file before making edits to understand its current state
+11. When you need to execute terminal commands in the sandbox, use the `shall_tool` native function instead of simulating command output in text
 
 ## Project Structure Guidelines
 

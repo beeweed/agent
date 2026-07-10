@@ -69,6 +69,21 @@ export interface ReplaceInFileResult {
   error?: string;
 }
 
+export interface ShallToolResult {
+  success: boolean;
+  session_name: string;
+  command: string;
+  wait_for_output: boolean;
+  output: string;
+  exit_code?: number | null;
+  timed_out: boolean;
+  started: boolean;
+  pid?: number | null;
+  background_pid?: number | null;
+  background_log_path?: string;
+  sandbox_id?: string | null;
+}
+
 export interface SandboxStatusResponse {
   session_id: string;
   provider: string;
@@ -103,6 +118,8 @@ export interface AgentEvent {
     | "read_file_end"
     | "replace_in_file_start"
     | "replace_in_file_end"
+    | "shall_tool_start"
+    | "shall_tool_end"
     | "sandbox_creation_start"
     | "sandbox_creation_log"
     | "sandbox_creation_end"
@@ -114,7 +131,7 @@ export interface AgentEvent {
   tool_name?: string;
   tool_id?: string;
   arguments?: Record<string, unknown>;
-  result?: ToolResult | ReadFileResult | ReplaceInFileResult;
+  result?: ToolResult | ReadFileResult | ReplaceInFileResult | ShallToolResult;
   total_iterations?: number;
   message?: string;
   chunk?: string;
@@ -156,7 +173,7 @@ export interface Memory {
 
 export interface ChatEntry {
   id: string;
-  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "replace_in_file_card";
+  type: "user" | "assistant" | "thought" | "file_card" | "tool_call" | "read_file_card" | "replace_in_file_card" | "shall_tool_card";
   content?: string;
   filePath?: string;
   fileStatus?: "writing" | "created" | "error" | "reading" | "read" | "replacing" | "replaced";
@@ -166,6 +183,11 @@ export interface ChatEntry {
   result?: ToolResult;
   readResult?: ReadFileResult;
   replaceResult?: ReplaceInFileResult;
+  shellResult?: ShallToolResult;
+  shellStatus?: "running" | "completed" | "error";
+  sessionName?: string;
+  command?: string;
+  waitForOutput?: boolean;
   timestamp: Date;
   isStreaming?: boolean;
   oldString?: string;

@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,7 @@ export function SettingsDialog() {
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
       <DialogContent
         data-design-id="settings-dialog"
+        aria-describedby={undefined}
         className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-lg bg-card border-border p-4 sm:p-6 rounded-xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
       >
         <DialogHeader>
@@ -138,7 +140,9 @@ export function SettingsDialog() {
             </div>
             <div>
               <DialogTitle data-design-id="settings-title" className="text-foreground">Settings</DialogTitle>
-              <p className="text-xs text-muted-foreground">Configure your LLM provider and Novita sandbox</p>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Configure your LLM provider and Novita sandbox.
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>

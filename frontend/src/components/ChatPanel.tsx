@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { ChatMessage } from "./ChatMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ModelSelector } from "./ModelSelector";
-import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult } from "@/types";
+import type { AgentEvent, ChatEntry, ReadFileResult, ReplaceInFileResult, ShallToolResult } from "@/types";
 import { Send, Settings, RotateCcw, Lightbulb } from "lucide-react";
 
 export function ChatPanel() {
@@ -79,6 +79,7 @@ export function ChatPanel() {
     let currentThoughtId: string | null = null;
     let currentReadFileCardId: string | null = null;
     let currentReplaceInFileCardId: string | null = null;
+    const shallToolCardIds = new Map<string, string>();
 
     try {
       await sendMessage(trimmedInput, (event: AgentEvent) => {
@@ -186,6 +187,25 @@ export function ChatPanel() {
             }
             break;
 
+          case "tool_call":
+            if (event.tool_name === "shall_tool") {
+              const args = event.arguments || {};
+              const shellEntry: ChatEntry = {
+                id: crypto.randomUUID(),
+                type: "shall_tool_card",
+                toolName: "shall_tool",
+                sessionName: String(args.session_name || ""),
+                command: String(args.command || ""),
+                waitForOutput: args.wait_for_output !== false,
+                shellStatus: "running",
+                iteration: event.iteration,
+                timestamp: new Date(),
+              };
+              shallToolCardIds.set(event.tool_id || shellEntry.id, shellEntry.id);
+              addChatEntry(shellEntry);
+            }
+            break;
+
           case "tool_result":
             if (event.tool_name === "file_write") {
               if (currentFileCardId) {
@@ -202,6 +222,15 @@ export function ChatPanel() {
               }
               setCodeStreaming({ isStreaming: false });
               void fetchFileTree();
+            } else if (event.tool_name === "shall_tool") {
+              const result = event.result as ShallToolResult;
+              const targetCardId = event.tool_id ? shallToolCardIds.get(event.tool_id) : null;
+              if (targetCardId) {
+                updateChatEntry(targetCardId, {
+                  shellStatus: result.success && !result.timed_out ? "completed" : "error",
+                  shellResult: result,
+                });
+              }
             }
             break;
 

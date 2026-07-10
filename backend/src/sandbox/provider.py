@@ -42,5 +42,16 @@ class BaseSandboxProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def run_terminal_command(
+        self,
+        state: SandboxSessionState,
+        session_name: str,
+        command: str,
+        wait_for_output: bool = True,
+        timeout_seconds: int = 180,
+    ) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
     def kill(self, state: SandboxSessionState) -> None:
         raise NotImplementedError

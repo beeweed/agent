@@ -72,4 +72,30 @@ TOOL_SCHEMAS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "shall_tool",
+            "description": "Executes shell (terminal) commands in a persistent sandbox session.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_name": {
+                        "type": "string",
+                        "description": "The name of the session to execute the command in."
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "The shell command to execute."
+                    },
+                    "wait_for_output": {
+                        "type": "boolean",
+                        "description": "If true, wait for the command to finish and return output. If false, run in background.",
+                        "default": True
+                    }
+                },
+                "required": ["session_name", "command"]
+            }
+        }
+    },
     ]

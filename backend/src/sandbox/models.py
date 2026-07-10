@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 SANDBOX_ROOT = "/home/user"
 SANDBOX_TIMEOUT_SECONDS = 3600
+SHALL_TOOL_TIMEOUT_SECONDS = 180
 
 SandboxStatus = Literal["idle", "creating", "ready", "error", "paused"]
 
@@ -44,6 +45,7 @@ class SandboxSessionState:
     updated_at: datetime = field(default_factory=utc_now)
     sandbox: Any | None = None
     config: SandboxConfig | None = None
+    terminal_sessions: dict[str, Any] = field(default_factory=dict)
 
     def touch(self) -> None:
         self.updated_at = utc_now()
@@ -59,4 +61,5 @@ class SandboxSessionState:
             "last_error": self.last_error,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat(),
+            "terminal_sessions": sorted(self.terminal_sessions.keys()),
         }

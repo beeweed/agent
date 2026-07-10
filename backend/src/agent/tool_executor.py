@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Callable, Awaitable, Dict
 
 from ..sandbox.manager import SandboxManager
-from ..sandbox.models import SANDBOX_ROOT
+from ..sandbox.models import SANDBOX_ROOT, SHALL_TOOL_TIMEOUT_SECONDS
 
 _sandbox_manager: SandboxManager | None = None
 
@@ -111,8 +111,60 @@ async def execute_replace_in_file(session_id: str, arguments: dict) -> dict:
     }
 
 
+async def execute_shall_tool(session_id: str, arguments: dict) -> dict:
+    manager = _require_manager()
+    session_name = arguments.get("session_name", "")
+    command = arguments.get("command", "")
+    wait_for_output = arguments.get("wait_for_output", True)
+
+    if not session_name:
+        return {
+            "success": False,
+            "session_name": session_name,
+            "command": command,
+            "wait_for_output": wait_for_output,
+            "output": "session_name is required",
+            "exit_code": None,
+            "timed_out": False,
+            "started": False,
+        }
+
+    if not command:
+        return {
+            "success": False,
+            "session_name": session_name,
+            "command": command,
+            "wait_for_output": wait_for_output,
+            "output": "command is required",
+            "exit_code": None,
+            "timed_out": False,
+            "started": False,
+        }
+
+    try:
+        return await manager.run_terminal_command(
+            session_id=session_id,
+            session_name=session_name,
+            command=command,
+            wait_for_output=wait_for_output,
+            timeout_seconds=SHALL_TOOL_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        return {
+            "success": False,
+            "session_name": session_name,
+            "command": command,
+            "wait_for_output": wait_for_output,
+            "output": str(exc),
+            "exit_code": None,
+            "timed_out": False,
+            "started": False,
+        }
+
+
 TOOL_EXECUTORS: Dict[str, Callable[..., Awaitable[dict]]] = {
     "file_write": execute_file_write,
     "file_read": execute_file_read,
     "replace_in_file": execute_replace_in_file,
+    "shall_tool": execute_shall_tool,
 }
